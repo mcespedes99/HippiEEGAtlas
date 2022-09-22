@@ -1,0 +1,31 @@
+configfile: "config/config.yaml" 
+
+print(config['hippunfoldData'])
+
+rule all:
+    input: 'sub-P022_space-T1w_den-0p5mm_label-hipp_surfaces.spec'
+
+rule hippunfold_exc:
+    input:
+        bids_dir = ('/home/ROBARTS/mcespedes/graham/projects/ctb-akhanf/akhanf/cfmm-bids/data/Khan/SNSX_7T/tar2bids_v0.0.5e/correct7T.v0.3')
+    params:
+        patients = config['hippunfoldData'],
+        o_dir = '/home/ROBARTS/mcespedes/scratch/Results/'
+    output:
+        'sub-P022_space-T1w_den-0p5mm_label-hipp_surfaces.spec'
+    shell:
+        ('hippunfold {input.bids_dir} {params.o_dir} participant --participant_label {params.patients} -n'
+         '--modality T1w --use-singularity --singularity-prefix $SNAKEMAKE_SINGULARITY_DIR')
+
+
+
+snsx_patients: >
+                sub-P022 sub-P026 sub-P029 sub-P032 sub-P046 sub-P048 sub-P049 sub-P051
+                sub-P052 sub-P054 sub-P055 sub-P056 sub-P058 sub-P059 sub-P060 sub-P061
+                sub-P070 sub-P071 sub-P080 sub-P081 sub-P087 sub-P089 sub-P090 sub-P092
+                sub-P095 sub-P097 sub-P100
+clinical_patients: > 
+                sub-P002 sub-P003 sub-P016 sub-P004	sub-P001 sub-P007 sub-P009 sub-P013
+                sub-P018 sub-P022 sub-P021 sub-P023 sub-P065 sub-P067 sub-P068 sub-P069
+                sub-P078 sub-P079 sub-P081 sub-P082 sub-P083 sub-P086 sub-P087 sub-P088
+                sub-P091 sub-P093 sub-P095

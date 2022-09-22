@@ -1,0 +1,31 @@
+from scripts.fileManagement import mkdir
+configfile: "config/config.yaml" 
+
+patients_snsx = config['snsx_patients'].split()
+patients_clinic = config['clinical_patients'].split()
+
+mkdir(patients_snsx, config['output_dir'])
+
+def str_sync(wildcards):
+    i=patients_snsx.index(wildcards.patients_snsx)
+    path = ('/home/ROBARTS/mcespedes/graham/projects/ctb-akhanf/akhanf/cfmm-bids/'
+           'data/Khan/clinical_imaging/epi_iEEG/derivatives/atlasreg/'
+           f'{patients_clinic[i]}/{patients_clinic[i]}_T1w.nii.gz')
+    return path
+
+rule all:
+    input: 
+        transformT1w = expand('/home/ROBARTS/mcespedes/graham/scratch/Test/warps/{patients_snsx}/{patients_snsx}_from-T1w_1_5T_to-T1w_7T.tfm',
+                               patients_snsx = config['snsx_patients'].split())
+
+rule ClinT1W_to_SNSX:
+    input:
+        snsx = '/home/ROBARTS/mcespedes/graham/projects/ctb-akhanf/cfmm-bids/Khan/SNSX_7T/tar2bids_v0.0.5e/correct7T.v0.3/gradcorrect_v0.0.3/{patients_snsx}/anat/{patients_snsx}_acq-MP2RAGE_run-01_T1w.nii.gz'
+    output:
+        transform = '/home/ROBARTS/mcespedes/graham/scratch/Test/warps/{patients_snsx}/{patients_snsx}_from-T1w_1_5T_to-T1w_7T.tfm'
+    params:
+        NxNxN = '100x40x20', # number of iterations per level of multi-res  
+        clinic_pat = str_sync,
+    shell:
+        ('greedy -d 3 -a -m NMI -i {input.snsx} {params.clinic_pat} -o {output.transform} -n {params.NxNxN}'
+        ' -ia-image-centers -dof 6')
