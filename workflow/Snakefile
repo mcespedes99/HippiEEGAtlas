@@ -1,44 +1,110 @@
-from scripts.fileManagement import mkdir
 configfile: "config/config.yaml" 
 
 patients_snsx = config['snsx_patients'].split()
 patients_clinic = config['clinical_patients'].split()
-
-mkdir(patients_snsx, config['output_dir'])
+outdir = config['output_dir']
 
 graham_dirs = {
     'CBS': '/home/ROBARTS/mcespedes/graham/',
     'graham': '/home/mcesped/'
 }
+# Change depending if running on the CBS or Graham
 graham_home = graham_dirs['CBS']
 
-def str_sync(wildcards):
+# Functions to define subjects paths
+def str_sync(wildcards, option):
     i=patients_snsx.index(wildcards.patients_snsx)
-    path = (graham_home+'projects/ctb-akhanf/cfmm-bids/Khan/clinical_imaging/epi_iEEG/derivatives/atlasreg/'
-           f'{patients_clinic[i]}/{patients_clinic[i]}_T1w.nii.gz')
+    if option == 'T1W':
+        path = (graham_home+'projects/ctb-akhanf/cfmm-bids/Khan/clinical_imaging/epi_iEEG/derivatives/atlasreg/'
+                f'{patients_clinic[i]}/{patients_clinic[i]}_T1w.nii.gz')
+    elif option == 'CT':
+        path = (graham_home+'projects/ctb-akhanf/cfmm-bids/Khan/clinical_imaging/epi_iEEG/derivatives/atlasreg/'
+               f'{patients_clinic[i]}/{patients_clinic[i]}_ct.nii.gz')
+    elif option == 'tfCT':
+        path = (graham_home+'projects/ctb-akhanf/cfmm-bids/Khan/clinical_imaging/epi_iEEG/derivatives/atlasreg/'
+              f'{patients_clinic[i]}/{patients_clinic[i]}_desc-affine_from-ct_to-T1w_type-ras_xfm.txt')
+    return path
+def snsx_path(wildcards):
+    path = graham_home+('projects/ctb-akhanf/cfmm-bids/Khan/SNSX_7T/tar2bids_v0.0.5e/'
+           f'correct7T.v0.3/gradcorrect_v0.0.3/{wildcards.patients_snsx}/anat/'
+           f'{wildcards.patients_snsx}_acq-MP2RAGE_run-01_T1w.nii.gz')
     return path
 
+# Rules
 rule all:
     input: 
-        transformT1w = expand(graham_home+'scratch/Test/warps/{patients_snsx}/{patients_snsx}_from-T1w_1_5T_to-T1w_7T.tfm',
-                               patients_snsx = config['snsx_patients'].split())
+        reg_1_5T_to_7T = expand(graham_home + outdir +('HippiEEGAtlas/anat/'
+                              '{patients_snsx}/{patients_snsx}_acq-MP2RAGE_run-01_T1w_7T-space.nii.gz'),
+                              patients_snsx = config['snsx_patients'].split()),
+        inv_tf_T1w = expand(graham_home + outdir +('HippiEEGAtlas/warps/{patients_snsx}/'\
+                            '{patients_snsx}_from-T1w_7T_to-T1w_1_5_type-itk.mat'),
+                            patients_snsx = config['snsx_patients'].split()),
+        tf_ct_to_T1w = expand(graham_home + outdir +('HippiEEGAtlas/warps/{patients_snsx}/'\
+                             '{patients_snsx}_desc-affine_from-ct_to-T1w_type-itk.mat'),
+                             patients_snsx = config['snsx_patients'].split())
 
+# Rules related to 1.5 T T1w -> 7T T1w: 
+# Calculate transform to go from 1.5 T T1w space to 7 T T1w space
 rule get_tf_ClinT1W_to_SNSX:
-    input:
-        snsx = graham_home+'projects/ctb-akhanf/cfmm-bids/Khan/SNSX_7T/tar2bids_v0.0.5e/correct7T.v0.3/gradcorrect_v0.0.3/{patients_snsx}/anat/{patients_snsx}_acq-MP2RAGE_run-01_T1w.nii.gz'
     output:
-        transform = graham_home+'scratch/Test/warps/{patients_snsx}/{patients_snsx}_from-T1w_1_5T_to-T1w_7T.tfm'
+        transform = graham_home + outdir +('HippiEEGAtlas/warps/{patients_snsx}/'
+                    '{patients_snsx}_from-T1w_1_5T_to-T1w_7T_type-ras.mat')
     params:
         NxNxN = '100x40x20', # number of iterations per level of multi-res  
-        clinic_pat = str_sync,
+        snsx = snsx_path,
+        clinic_path = lambda wc: str_sync(wc, option='T1W')
     shell:
-        ('greedy -d 3 -a -m NMI -i {input.snsx} {params.clinic_pat} -o {output.transform} -n {params.NxNxN}'
+        ('greedy -d 3 -a -m NMI -i {params.snsx} {params.clinic_path} -o {output.transform} -n {params.NxNxN}'
         ' -ia-image-centers -dof 6')
 
-# rule conv_tf_itk:
-#     input: 
-#         transformT1w = graham_home+'scratch/Test/warps/{patients_snsx}/{patients_snsx}_from-T1w_1_5T_to-T1w_7T.tfm'
-#     output:
-#         transform_itk = graham_home+'scratch/Test/warps/{patients_snsx}/{patients_snsx}_from-T1w_1_5T_to-T1w_7T_itk.tfm'
-#     shell:
-#         ('	c3d_affine_tool -ref ~/graham/projects/ctb-akhanf/cfmm-bids/Khan/SNSX_7T/tar2bids_v0.0.5e/correct7T.v0.3/gradcorrect_v0.0.3/sub-P022/anat/sub-P022_acq-MP2RAGE_run-01_T1w.nii.gz -src ~/graham/projects/ctb-akhanf/cfmm-bids/Khan/clinical_imaging/epi_iEEG/derivatives/atlasreg/sub-P002/sub-P002_T1w.nii.gz ~/graham/scratch/Test/Transforms/sub-P022_from-T1w_to-T1w.mat -oitk ~/graham/scratch/Test/Transforms/sub-P022_from-T1w_to-T1w_itk.mat')
+# Transform from previous rule to itk transform
+rule conv_T1w_tf_itk:
+    input: 
+        tf_T1w_RAS = rules.get_tf_ClinT1W_to_SNSX.output.transform
+    output:
+        tf_T1w_itk = graham_home + outdir +('HippiEEGAtlas/warps/{patients_snsx}/'\
+                     '{patients_snsx}_from-T1w_1_5T_to-T1w_7T_type-itk.mat')
+    params:
+        snsx = snsx_path,
+        clinic_path = lambda wc: str_sync(wc, option='T1W')
+    shell:
+        ('c3d_affine_tool -ref {params.snsx} -src {params.clinic_path} {input.tf_T1w_RAS}'
+        ' -oitk {output.tf_T1w_itk}')
+
+# Transform 1.5 T T1w image to 7 T T1w space
+rule apply_T1w_tf:
+    input:
+        tf_T1w_itk = rules.conv_T1w_tf_itk.output.tf_T1w_itk
+    output:
+        T1w_7T_space = graham_home + outdir +('HippiEEGAtlas/anat/'
+                        '{patients_snsx}/{patients_snsx}_acq-MP2RAGE_run-01_T1w_7T-space.nii.gz')
+    params:
+        snsx = snsx_path,
+        clinic_path = lambda wc: str_sync(wc, option='T1W')
+    shell:
+        ('antsApplyTransforms -d 3 -i {params.clinic_path} -o {output.T1w_7T_space}'
+        ' -t {input.tf_T1w_itk} -r {params.snsx}')
+
+# Get inverse of transform from rule conv_T1w_tf_itk
+rule inv_T1w_tf:
+    input:
+        tf_T1w_itk = rules.conv_T1w_tf_itk.output.tf_T1w_itk
+    output:
+        inv_tf_T1w = graham_home + outdir +('HippiEEGAtlas/warps/{patients_snsx}/'\
+                     '{patients_snsx}_from-T1w_7T_to-T1w_1_5_type-itk.mat')
+    shell:
+        'c3d_affine_tool -itk {input.tf_T1w_itk} -oitk {output.inv_tf_T1w}'
+
+# Rules related to CT to 1.5 T T1w
+# Convert trasform (CT->T1w) to itk format
+rule conv_tf_ct_to_T1W:
+    params:
+        ref = lambda wc: str_sync(wc, option='T1W'),
+        mov_img = lambda wc: str_sync(wc, option='CT'),
+        tf_ras = lambda wc: str_sync(wc, option='tfCT'),
+    output:
+        tf_itk = graham_home + outdir +('HippiEEGAtlas/warps/{patients_snsx}/'\
+                 '{patients_snsx}_desc-affine_from-ct_to-T1w_type-itk.mat')
+    shell:
+        ('c3d_affine_tool -ref {params.ref} -src {params.mov_img} {params.tf_ras}'
+        ' -oitk {output.tf_itk}')

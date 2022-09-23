@@ -1,6 +1,7 @@
 snsx_patients: >
-                sub-P022 sub-P026 sub-P029 sub-P032
+                sub-P022 sub-P026
 clinical_patients: > 
-                sub-P002 sub-P003 sub-P016 sub-P004
+                sub-P002 sub-P003
 
-output_dir: /home/ROBARTS/mcespedes/graham/scratch/Test
+# From graham home folder:
+output_dir: scratch/Test/
