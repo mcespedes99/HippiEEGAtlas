@@ -2,3 +2,8 @@ venv
 .snakemake
 .vscode
 __pycache__
+logs
+core*
+slurm8
+Test
+slurm*

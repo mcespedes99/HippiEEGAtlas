@@ -1,7 +1,28 @@
 snsx_patients: >
-                sub-P022 sub-P026
+                sub-P080
+                sub-P081
+                sub-P087
+                sub-P089
+                sub-P090
+                sub-P092
+                sub-P095
+                sub-P097
+                sub-P100
 clinical_patients: > 
-                sub-P002 sub-P003
+                sub-P081
+                sub-P082
+                sub-P083
+                sub-P086
+                sub-P087
+                sub-P088
+                sub-P091
+                sub-P093
+                sub-P095
 
 # From graham home folder:
 output_dir: scratch/Test/
+
+singularity:
+  ants: 'docker://kaczmarj/ants:2.3.4'
+  c3d: 'docker://nipype/nipype:latest'
+  greedy: 'docker://dorianps/itksnap:latest'
