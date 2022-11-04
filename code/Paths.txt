@@ -1,0 +1,6 @@
+SNSX: /project/6050199/akhanf/cfmm-bids/data/Khan/SNSX_7T/tar2bids_v0.0.5e/correct7T.v0.3/gradcorrect_v0.0.3
+Clinical: /project/6050199/akhanf/cfmm-bids/data/Khan/clinical_imaging/epi_iEEG/bids
+contact coordinates in preop T1w space: ../derivatives/seega_coordinates/sub-P###/sub-P###_space-native_SEEGA.fcsv
+preop T1w clinical: ../derivatives/atlasreg/sub-P###/sub-P###_T1w.nii.gz
+postop CT with electrodes: ../derivatives/atlasreg/sub-P###/sub-P###_ct.nii.gz
+CT to T1w transform: ../derivatives/atlasreg/sub-P###/sub-P###_desc-rigid_from-ct_to-T1w_type-ras_xfm.tfm
