@@ -7,3 +7,5 @@ core*
 slurm8
 Test
 slurm*
+code/Position/.ipynb_checkpoints/
+code/DSP/.ipynb_checkpoints/*
