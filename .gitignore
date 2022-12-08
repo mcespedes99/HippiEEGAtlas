@@ -9,3 +9,6 @@ Test
 slurm*
 code/Position/.ipynb_checkpoints/
 code/DSP/.ipynb_checkpoints/*
+epochs/logs/
+epochs/results
+workflow/.ipynb_checkpoints/
