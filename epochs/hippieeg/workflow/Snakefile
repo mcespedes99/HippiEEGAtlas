@@ -2,6 +2,7 @@
 
 import snakebids
 from snakebids import bids
+from os.path import join
 
 configfile: workflow.source_path('../config/snakebids.yml')
 
@@ -26,6 +27,8 @@ print(inputs.path)
 rule epochs:
     input: 
         inputs.path['bold']
+    params:
+        script = join(workflow.basedir,'../code/epochs.py')
     output:
         bids(
             root=config['output_dir'],
@@ -39,7 +42,7 @@ rule epochs:
             suffix='epochs.log',
             **inputs.wildcards['bold']
         )
-    script: '/scratch/mcesped/HippiEEGAtlas/epochs/hippieeg/code/epochs.py {input} {output}'
+    shell: 'python {params.script} {input} {output} &> {log}'
 
 rule all:
     input:
