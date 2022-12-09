@@ -12,3 +12,5 @@ code/DSP/.ipynb_checkpoints/*
 epochs/logs/
 epochs/results
 workflow/.ipynb_checkpoints/
+epochs/.snakebids
+epochs/config/

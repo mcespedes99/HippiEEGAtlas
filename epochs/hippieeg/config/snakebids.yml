@@ -25,8 +25,8 @@ targets_by_analysis_level:
 pybids_inputs:
   bold:
     filters:
-      suffix: 'ieeg'
-      extension: '.edf'
+      suffix: 'channels'
+      extension: '.tsv'
       datatype: 'ieeg'
     wildcards:
       - subject

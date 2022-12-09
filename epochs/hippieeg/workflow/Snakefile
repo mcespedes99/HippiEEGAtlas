@@ -3,6 +3,10 @@
 import snakebids
 from snakebids import bids
 from os.path import join
+# import sys
+# sys.path.append('/scratch/mcesped/HippiEEGAtlas/epochs/hippieeg/code')
+# from file_manager import bids_folder
+
 
 configfile: workflow.source_path('../config/snakebids.yml')
 
@@ -18,10 +22,10 @@ inputs = snakebids.generate_inputs(
     use_bids_inputs=True,
 )
 
-
 #this adds constraints to the bids naming
 wildcard_constraints:  **snakebids.get_wildcard_constraints(config['pybids_inputs'])
-print(inputs.path)
+# print(inputs.path)
+# print(inputs.zip_lists['bold']['session'])
 
 #---- end snakebids boilerplate ------------------------------------------------
 rule epochs:
@@ -33,7 +37,7 @@ rule epochs:
         bids(
             root=config['output_dir'],
             datatype='ieeg',
-            suffix='epoch.edf',
+            suffix='channels.tsv',
             **inputs.wildcards['bold']
         )
     log:
@@ -42,7 +46,7 @@ rule epochs:
             suffix='epochs.log',
             **inputs.wildcards['bold']
         )
-    shell: 'python {params.script} {input} {output} &> {log}'
+    shell: 'python {params.script} {input} {output}'
 
 rule all:
     input:

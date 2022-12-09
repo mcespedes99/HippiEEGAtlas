@@ -1,5 +1,9 @@
 import pyedflib
 import numpy as np
+import os, fnmatch
+from collections import OrderedDict
+from pathlib import Path
+from typing import Union
 
 def create_EDF(edf_in, time_stamps, out_path):
     # First import labels
@@ -59,3 +63,66 @@ def create_EDF(edf_in, time_stamps, out_path):
     except Exception:
         traceback.print_exc()
         edf_out.close()
+
+def find(pattern, path):
+    result = []
+    for root, dirs, files in os.walk(path):
+        for name in files:
+            if fnmatch.fnmatch(name, pattern):
+                result.append(os.path.join(root, name))
+    return result
+
+def bids_folder(
+    root: Union[str, Path] = None,
+    datatype: str = None,
+    prefix: str = None,
+    suffix: str = None,
+    subject: str = None,
+    session: str = None,
+    include_subject_dir: bool = True,
+    include_session_dir: bool = True,
+    **entities: str,
+):
+    # Recovered from snakebids code
+    # replace underscores in keys (needed so that users can use reserved
+    # keywords by appending a _)
+    entities = {k.replace("_", ""): v for k, v in entities.items()}
+
+    # strict ordering of bids entities is specified here:
+    # pylint: disable=unsubscriptable-object
+    order: OrderedDict[str, Optional[str]] = OrderedDict(
+        [
+            ("task", None),
+            ("acq", None),
+            ("ce", None),
+            ("rec", None),
+            ("dir", None),
+            ("run", None),
+            ("mod", None),
+            ("echo", None),
+            ("hemi", None),
+            ("space", None),
+            ("res", None),
+            ("den", None),
+            ("label", None),
+            ("desc", None),
+        ]
+    )
+
+    # Now add in entities (this preserves ordering above)
+    for key, val in entities.items():
+        order[key] = val
+    
+    # Form folder using list similar to filename, above. Filter out Nones, and convert
+    # to Path.
+    folder = Path(
+        *filter(
+            None,
+            [
+                str(root) if root else None,
+                f"sub-{subject}" if subject and include_subject_dir else None
+            ],
+        )
+    )
+
+    return str(folder)
