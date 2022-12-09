@@ -3,6 +3,7 @@
 import snakebids
 from snakebids import bids
 from os.path import join
+from itertools import compress
 
 configfile: workflow.source_path('../config/snakebids.yml')
 
@@ -23,10 +24,16 @@ inputs = snakebids.generate_inputs(
 wildcard_constraints:  **snakebids.get_wildcard_constraints(config['pybids_inputs'])
 print(inputs.path)
 
+zip_list_no_session = inputs.zip_lists
+del zip_list_no_session['sessions']
+
+input_wildcards_no_session = inputs.wildcards
+del input_wildcards_no_session['session']
+
 #---- end snakebids boilerplate ------------------------------------------------
 rule epochs:
     input: 
-        inputs.path['bold']
+        lambda wildcards: expand(inputs.path['bold'], session = list(compress(inputs.zip_lists['bold']['sessions'], inputs.zip_lists['bold']['subjects'] == wildcards.subject)), allow_missing=True)
     params:
         script = join(workflow.basedir,'../code/epochs.py')
     output:
@@ -34,13 +41,13 @@ rule epochs:
             root=config['output_dir'],
             datatype='ieeg',
             suffix='epoch.edf',
-            **inputs.wildcards['bold']
+            **input_wildcards_no_session
         )
     log:
         bids(
             root='/scratch/mcesped/HippiEEGAtlas/epochs/logs',
             suffix='epochs.log',
-            **inputs.wildcards['bold']
+            **input_wildcards_no_session
         )
     shell: 'python {params.script} {input} {output} &> {log}'
 
@@ -52,6 +59,6 @@ rule all:
                 allow_missing=True,
             ),
             zip,
-            **inputs.zip_lists['bold']
+            **zip_list_no_session
         )
     default_target: True
