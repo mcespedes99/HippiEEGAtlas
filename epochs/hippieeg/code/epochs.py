@@ -17,6 +17,9 @@ parser.add_argument("-p", "--processes" ,metavar='PROCESESS',
 parser.add_argument("-i", "--input", metavar='INPUT',
                     nargs = '*',
                     help='Path to subject directory')
+parser.add_argument("-a", "--annot", metavar='ANNOTATION',
+                    nargs = '*',
+                    help='Path to annotation file')
 parser.add_argument("-t", "--tsv", metavar='INPUT_TSV',
                     nargs = '*',
                     help='Path to TSV file')
@@ -27,6 +30,7 @@ parser.add_argument("-o", "--output" ,metavar='OUTPUT',
 args = parser.parse_args()
 
 input_files = args.input
+annot_files = args.annot
 output_dir = args.output[0]
 processes = int(args.processes[0])
 tsv_file = args.tsv[0]
@@ -41,27 +45,30 @@ try:
     pattern_dir = r'ses-\d{3}/.+/'
     pattern_ieeg = r'sub-\d{3}_ses-\d{3}_task-(.+)_run-\d{2}_ieeg'
     # Loop through different edf files given by snakebids
-    for edf in input_files:
-        # I'm planning to change this to use the tsv files to check the annotations as
+    for file_id in range(len(input_files)):
+        # Open annotation file to check if any event is in the data
+        annot = pd.read_csv(annot_files[file_id], sep='\t')
+        
+        #I'm planning to change this to use the tsv files to check the annotations as
         # loading the edf files takes a while (to make it more efficient)
-        f = pyedflib.EdfReader(edf)
-        # Get labels:
-        labels = f.getSignalLabels()
-        # Create df with annotations
-        annot = f.readAnnotations()
-        f.close()
-        annot = {
-            'Onset': annot[0],
-            'Duration': annot[1],
-            'event': annot[2]
-        }
-        annot = pd.DataFrame(annot)
 
-        # Find time stamps where the 'awake trigger' event is happening
+        # Find time stamps indexes where the 'awake trigger' event is happening
         id = annot['event'].str.contains('awake trigger', case=False)
-        time_stamps = annot.Onset.to_numpy()[id]
+        # Check if any results are obtained
+        check_size = ~id
         # If any event is found, then the pipeline is run
-        if time_stamps.size > 0:
+        if ~check_size.all():
+            # I could grab the time stamps from the tsv but the ones in the edf have more
+            # precision.
+            edf = input_files[file_id]
+            f = pyedflib.EdfReader(edf)
+            # Get labels:
+            labels = f.getSignalLabels()
+            # Create df with annotations
+            onset_list = f.readAnnotations()[0]
+            f.close()
+            # Find time stamps where the 'awake trigger' event is happening
+            time_stamps = onset_list[id]
             # Copy file to local scratch
             shutil.copy(edf, '/tmp/')
             new_edf ='/tmp/'+re.search(pattern_complete, edf).group()
