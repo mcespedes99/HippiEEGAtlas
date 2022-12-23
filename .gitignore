@@ -14,3 +14,4 @@ epochs/results
 workflow/.ipynb_checkpoints/
 epochs/.snakebids
 epochs/config/
+code/DSP/test2.edf

@@ -1,4 +1,5 @@
 bids_dir: '/home/mcesped/projects/ctb-akhanf/cfmm-bids/Khan/epi_iEEG/ieeg'
+# bids_dir_tsv: '/home/mcesped/projects/ctb-akhanf/cfmm-bids/Khan/clinical_imaging/epi_iEEG/derivatives/seega_coordinates'
 output_dir: '/scratch/mcesped/epochs/results'
 
 #enable printing debug statements during parsing -- disable if generating dag visualization
@@ -25,8 +26,8 @@ targets_by_analysis_level:
 pybids_inputs:
   bold:
     filters:
-      suffix: 'channels'
-      extension: '.tsv'
+      suffix: 'ieeg'
+      extension: '.edf'
       datatype: 'ieeg'
     wildcards:
       - subject
@@ -34,6 +35,19 @@ pybids_inputs:
       - acquisition
       - task
       - run
+
+pybids_inputs_tsv:
+  bold:
+    filters:
+      suffix: 'native_SEEG'
+      extension: '.tsv'
+    wildcards:
+      - subject
+      - session
+      - acquisition
+      - task
+      - run
+    custom_path: '/home/mcesped/projects/ctb-akhanf/cfmm-bids/Khan/clinical_imaging/epi_iEEG/derivatives/seega_coordinates/sub-P{subject}/sub-P{subject}_space-native_SEEGA.tsv'
 
 #this configures the options to save the BIDSLayout
 # by default, database is not saved (uncomment to save)
