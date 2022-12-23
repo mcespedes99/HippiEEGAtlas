@@ -24,8 +24,20 @@ inputs = snakebids.generate_inputs(
     use_bids_inputs=True,
 )
 subj_session_list = list(zip(inputs.zip_lists['bold']['subject'],inputs.zip_lists['bold']['session']))
-input_tsv = snakebids.generate_inputs(
+# Annotation files
+inputs_annot = snakebids.generate_inputs(
     bids_dir=config["bids_dir"],
+    pybids_inputs=config["pybids_inputs_annot"],
+    pybids_database_dir=config.get("pybids_db_dir"),
+    pybids_reset_database=config.get("pybids_db_reset"),
+    derivatives=config.get("derivatives", None),
+    participant_label=config.get("participant_label", None),
+    exclude_participant_label=config.get("exclude_participant_label", None),
+    use_bids_inputs=True,
+)
+# TSV files input
+input_tsv = snakebids.generate_inputs(
+    bids_dir=config["bids_dir_tsv"],
     pybids_inputs=config["pybids_inputs_tsv"],
     pybids_database_dir=config.get("pybids_db_dir"),
     pybids_reset_database=config.get("pybids_db_reset"),
@@ -55,10 +67,18 @@ rule epochs:
                                 run = list(compress(inputs.zip_lists['bold']['run'], 
                                         [True if subj == wildcards.subject else False for subj in inputs.zip_lists['bold']['subject']])),
                                 allow_missing=True),
+        annot = lambda wildcards: expand(inputs_annot.path['bold'], zip,
+	                        session = list(compress(inputs_annot.zip_lists['bold']['session'],
+                                        [True if subj == wildcards.subject else False for subj in inputs_annot.zip_lists['bold']['subject']])),
+                                task = list(compress(inputs_annot.zip_lists['bold']['task'], 
+                                        [True if subj == wildcards.subject else False for subj in inputs_annot.zip_lists['bold']['subject']])),
+                                run = list(compress(inputs_annot.zip_lists['bold']['run'], 
+                                        [True if subj == wildcards.subject else False for subj in inputs_annot.zip_lists['bold']['subject']])),
+                                allow_missing=True),
         tsv = input_tsv.path['bold']
     params:
         script = join(workflow.basedir,'../code/epochs.py'),
-        processes = 16
+        processes = 8
     output:
         directory(
 		bids_folder(
@@ -74,7 +94,7 @@ rule epochs:
     #         suffix='epochs.log',
     #         **inputs.wildcards['bold']
     #     )
-    shell: 'python {params.script} -p {params.processes} -i {input.edf} -t {input.tsv} -o {output}'
+    shell: 'python {params.script} -p {params.processes} -i {input.edf} -a {input.annot} -t {input.tsv} -o {output}'
 
 rule all:
     input:

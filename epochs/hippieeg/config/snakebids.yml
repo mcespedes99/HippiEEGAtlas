@@ -1,5 +1,5 @@
 bids_dir: '/home/mcesped/projects/ctb-akhanf/cfmm-bids/Khan/epi_iEEG/ieeg'
-# bids_dir_tsv: '/home/mcesped/projects/ctb-akhanf/cfmm-bids/Khan/clinical_imaging/epi_iEEG/derivatives/seega_coordinates'
+bids_dir_tsv: '/home/mcesped/projects/ctb-akhanf/cfmm-bids/Khan/clinical_imaging/epi_iEEG/derivatives/seega_coordinates'
 output_dir: '/scratch/mcesped/epochs/results'
 
 #enable printing debug statements during parsing -- disable if generating dag visualization
@@ -28,6 +28,19 @@ pybids_inputs:
     filters:
       suffix: 'ieeg'
       extension: '.edf'
+      datatype: 'ieeg'
+    wildcards:
+      - subject
+      - session
+      - acquisition
+      - task
+      - run
+
+pybids_inputs_annot:
+  bold:
+    filters:
+      suffix: 'annotations'
+      extension: '.tsv'
       datatype: 'ieeg'
     wildcards:
       - subject
