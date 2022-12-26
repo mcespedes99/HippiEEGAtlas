@@ -24,7 +24,7 @@ targets_by_analysis_level:
 #    https://bids-standard.github.io/pybids/generated/bids.layout.BIDSLayout.html#bids.layout.BIDSLayout.get
 
 pybids_inputs:
-  bold:
+  ieeg:
     filters:
       suffix: 'ieeg'
       extension: '.edf'
@@ -36,8 +36,7 @@ pybids_inputs:
       - task
       - run
 
-pybids_inputs_annot:
-  bold:
+  annotations:
     filters:
       suffix: 'annotations'
       extension: '.tsv'
@@ -49,10 +48,10 @@ pybids_inputs_annot:
       - task
       - run
 
-pybids_inputs_tsv:
-  bold:
+  seega_tsv:
     filters:
       suffix: 'native_SEEG'
+      space: 'native'
       extension: '.tsv'
     wildcards:
       - subject

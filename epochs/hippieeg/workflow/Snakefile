@@ -25,27 +25,27 @@ inputs = snakebids.generate_inputs(
 )
 subj_session_list = list(zip(inputs.zip_lists['bold']['subject'],inputs.zip_lists['bold']['session']))
 # Annotation files
-inputs_annot = snakebids.generate_inputs(
-    bids_dir=config["bids_dir"],
-    pybids_inputs=config["pybids_inputs_annot"],
-    pybids_database_dir=config.get("pybids_db_dir"),
-    pybids_reset_database=config.get("pybids_db_reset"),
-    derivatives=config.get("derivatives", None),
-    participant_label=config.get("participant_label", None),
-    exclude_participant_label=config.get("exclude_participant_label", None),
-    use_bids_inputs=True,
-)
-# TSV files input
-input_tsv = snakebids.generate_inputs(
-    bids_dir=config["bids_dir_tsv"],
-    pybids_inputs=config["pybids_inputs_tsv"],
-    pybids_database_dir=config.get("pybids_db_dir"),
-    pybids_reset_database=config.get("pybids_db_reset"),
-    derivatives=config.get("derivatives", None),
-    participant_label=config.get("participant_label", None),
-    exclude_participant_label=config.get("exclude_participant_label", None),
-    use_bids_inputs=True,
-)
+# inputs_annot = snakebids.generate_inputs(
+#     bids_dir=config["bids_dir"],
+#     pybids_inputs=config["pybids_inputs_annot"],
+#     pybids_database_dir=config.get("pybids_db_dir"),
+#     pybids_reset_database=config.get("pybids_db_reset"),
+#     derivatives=config.get("derivatives", None),
+#     participant_label=config.get("participant_label", None),
+#     exclude_participant_label=config.get("exclude_participant_label", None),
+#     use_bids_inputs=True,
+# )
+# # TSV files input
+# input_tsv = snakebids.generate_inputs(
+#     bids_dir=config["bids_dir_tsv"],
+#     pybids_inputs=config["pybids_inputs_tsv"],
+#     pybids_database_dir=config.get("pybids_db_dir"),
+#     pybids_reset_database=config.get("pybids_db_reset"),
+#     derivatives=config.get("derivatives", None),
+#     participant_label=config.get("participant_label", None),
+#     exclude_participant_label=config.get("exclude_participant_label", None),
+#     use_bids_inputs=True,
+# )
 
 #this adds constraints to the bids naming
 wildcard_constraints:  **snakebids.get_wildcard_constraints(config['pybids_inputs'])
@@ -59,23 +59,23 @@ wildcard_constraints:  **snakebids.get_wildcard_constraints(config['pybids_input
 #---- end snakebids boilerplate ------------------------------------------------
 rule epochs:
     input: 
-        edf = lambda wildcards: expand(inputs.path['bold'], zip,
-	                        session = list(compress(inputs.zip_lists['bold']['session'],
-                                        [True if subj == wildcards.subject else False for subj in inputs.zip_lists['bold']['subject']])),
-                                task = list(compress(inputs.zip_lists['bold']['task'], 
-                                        [True if subj == wildcards.subject else False for subj in inputs.zip_lists['bold']['subject']])),
-                                run = list(compress(inputs.zip_lists['bold']['run'], 
-                                        [True if subj == wildcards.subject else False for subj in inputs.zip_lists['bold']['subject']])),
+        edf = lambda wildcards: expand(inputs.path['ieeg'], zip,
+	                        session = list(compress(inputs.zip_lists['ieeg']['session'],
+                                        [True if subj == wildcards.subject else False for subj in inputs.zip_lists['ieeg']['subject']])),
+                                task = list(compress(inputs.zip_lists['ieeg']['task'], 
+                                        [True if subj == wildcards.subject else False for subj in inputs.zip_lists['ieeg']['subject']])),
+                                run = list(compress(inputs.zip_lists['ieeg']['run'], 
+                                        [True if subj == wildcards.subject else False for subj in inputs.zip_lists['ieeg']['subject']])),
                                 allow_missing=True),
         annot = lambda wildcards: expand(inputs_annot.path['bold'], zip,
-	                        session = list(compress(inputs_annot.zip_lists['bold']['session'],
-                                        [True if subj == wildcards.subject else False for subj in inputs_annot.zip_lists['bold']['subject']])),
-                                task = list(compress(inputs_annot.zip_lists['bold']['task'], 
-                                        [True if subj == wildcards.subject else False for subj in inputs_annot.zip_lists['bold']['subject']])),
-                                run = list(compress(inputs_annot.zip_lists['bold']['run'], 
-                                        [True if subj == wildcards.subject else False for subj in inputs_annot.zip_lists['bold']['subject']])),
+	                        session = list(compress(inputs.zip_lists['annotations']['session'],
+                                        [True if subj == wildcards.subject else False for subj in inputs.zip_lists['annotations']['subject']])),
+                                task = list(compress(inputs.zip_lists['annotations']['task'], 
+                                        [True if subj == wildcards.subject else False for subj in inputs.zip_lists['annotations']['subject']])),
+                                run = list(compress(inputs.zip_lists['annotations']['run'], 
+                                        [True if subj == wildcards.subject else False for subj in inputs.zip_lists['annotations']['subject']])),
                                 allow_missing=True),
-        tsv = input_tsv.path['bold']
+        tsv = input.path['seega_tsv']
     params:
         script = join(workflow.basedir,'../code/epochs.py'),
         processes = 8
@@ -85,7 +85,7 @@ rule epochs:
 	            root=config['output_dir'],
         	    datatype='ieeg',
         	    suffix='channels.tsv',
-	            **inputs.wildcards['bold']
+	            **inputs.wildcards['ieeg']
         	)
 	)
     # log:
@@ -104,6 +104,6 @@ rule all:
                 allow_missing=True,
             ),
             zip,
-            **inputs.zip_lists['bold']
+            **inputs.zip_lists['ieeg']
         )
     default_target: True
