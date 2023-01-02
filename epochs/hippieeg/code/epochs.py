@@ -48,9 +48,6 @@ try:
     for file_id in range(len(input_files)):
         # Open annotation file to check if any event is in the data
         annot = pd.read_csv(annot_files[file_id], sep='\t')
-        
-        #I'm planning to change this to use the tsv files to check the annotations as
-        # loading the edf files takes a while (to make it more efficient)
 
         # Find time stamps indexes where the 'awake trigger' event is happening
         id = annot['event'].str.contains('awake trigger', case=False)
