@@ -23,7 +23,7 @@ inputs = snakebids.generate_inputs(
     exclude_participant_label=config.get("exclude_participant_label", None),
     use_bids_inputs=True,
 )
-subj_session_list = list(zip(inputs.zip_lists['bold']['subject'],inputs.zip_lists['bold']['session']))
+subj_session_list = list(zip(inputs.zip_lists['ieeg']['subject'],inputs.zip_lists['ieeg']['session']))
 # Annotation files
 # inputs_annot = snakebids.generate_inputs(
 #     bids_dir=config["bids_dir"],
@@ -67,7 +67,7 @@ rule epochs:
                                 run = list(compress(inputs.zip_lists['ieeg']['run'], 
                                         [True if subj == wildcards.subject else False for subj in inputs.zip_lists['ieeg']['subject']])),
                                 allow_missing=True),
-        annot = lambda wildcards: expand(inputs_annot.path['bold'], zip,
+        annot = lambda wildcards: expand(inputs.path['annotations'], zip,
 	                        session = list(compress(inputs.zip_lists['annotations']['session'],
                                         [True if subj == wildcards.subject else False for subj in inputs.zip_lists['annotations']['subject']])),
                                 task = list(compress(inputs.zip_lists['annotations']['task'], 
@@ -75,7 +75,7 @@ rule epochs:
                                 run = list(compress(inputs.zip_lists['annotations']['run'], 
                                         [True if subj == wildcards.subject else False for subj in inputs.zip_lists['annotations']['subject']])),
                                 allow_missing=True),
-        tsv = input.path['seega_tsv']
+        tsv = inputs.path['seega_tsv']
     params:
         script = join(workflow.basedir,'../code/epochs.py'),
         processes = 8
