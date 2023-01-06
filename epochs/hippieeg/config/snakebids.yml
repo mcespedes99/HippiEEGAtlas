@@ -1,6 +1,6 @@
-bids_dir: '/home/mcesped/projects/ctb-akhanf/cfmm-bids/Khan/epi_iEEG/ieeg'
+# bids_dir: '/home/mcesped/projects/ctb-akhanf/cfmm-bids/Khan/epi_iEEG/ieeg'
 bids_dir_tsv: '/home/mcesped/projects/ctb-akhanf/cfmm-bids/Khan/clinical_imaging/epi_iEEG/derivatives/seega_coordinates'
-output_dir: '/scratch/mcesped/epochs/results'
+# output_dir: '/scratch/mcesped/epochs/results'
 
 #enable printing debug statements during parsing -- disable if generating dag visualization
 debug: False
