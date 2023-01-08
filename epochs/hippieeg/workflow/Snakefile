@@ -4,6 +4,7 @@ import snakebids
 from snakebids import bids
 from os.path import join
 from itertools import compress
+import fnmatch
 import numpy as np
 import sys
 sys.path.append('/scratch/mcesped/HippiEEGAtlas/epochs/hippieeg/code')
@@ -24,28 +25,6 @@ inputs = snakebids.generate_inputs(
     use_bids_inputs=True,
 )
 subj_session_list = list(zip(inputs.zip_lists['ieeg']['subject'],inputs.zip_lists['ieeg']['session']))
-# Annotation files
-# inputs_annot = snakebids.generate_inputs(
-#     bids_dir=config["bids_dir"],
-#     pybids_inputs=config["pybids_inputs_annot"],
-#     pybids_database_dir=config.get("pybids_db_dir"),
-#     pybids_reset_database=config.get("pybids_db_reset"),
-#     derivatives=config.get("derivatives", None),
-#     participant_label=config.get("participant_label", None),
-#     exclude_participant_label=config.get("exclude_participant_label", None),
-#     use_bids_inputs=True,
-# )
-# # TSV files input
-# input_tsv = snakebids.generate_inputs(
-#     bids_dir=config["bids_dir_tsv"],
-#     pybids_inputs=config["pybids_inputs_tsv"],
-#     pybids_database_dir=config.get("pybids_db_dir"),
-#     pybids_reset_database=config.get("pybids_db_reset"),
-#     derivatives=config.get("derivatives", None),
-#     participant_label=config.get("participant_label", None),
-#     exclude_participant_label=config.get("exclude_participant_label", None),
-#     use_bids_inputs=True,
-# )
 
 #this adds constraints to the bids naming
 wildcard_constraints:  **snakebids.get_wildcard_constraints(config['pybids_inputs'])
@@ -56,6 +35,13 @@ wildcard_constraints:  **snakebids.get_wildcard_constraints(config['pybids_input
 # print(inputs.zip_lists['bold']['subject'])
 # print(inputs.zip_lists['bold']['session'])
 
+# def get_edf_files(wildcards):
+#     files = []
+#     for root, dirs, files in os.walk(config["bids_dir"]+'/bids/'+f'/sub-{wildcards.subject}/'):
+#         for name in files:
+#             if fnmatch.fnmatch(name, '*_ieeg.edf'):
+#                 files.append(os.path.join(root, name))
+#     return files
 #---- end snakebids boilerplate ------------------------------------------------
 rule epochs:
     input: 
@@ -75,26 +61,30 @@ rule epochs:
                                 run = list(compress(inputs.zip_lists['annotations']['run'], 
                                         [True if subj == wildcards.subject else False for subj in inputs.zip_lists['annotations']['subject']])),
                                 allow_missing=True),
-        tsv = inputs.path['seega_tsv']
+        tsv = inputs.path['seega_tsv'],
+        parc = inputs.path['parc'],
+        tf = inputs.path['tf']
     params:
         script = join(workflow.basedir,'../code/epochs.py'),
-        processes = 8
+        processes = 16,
+        mem = 64000
     output:
-        directory(
-		bids_folder(
-	            root=config['output_dir'],
-        	    datatype='ieeg',
-        	    suffix='channels.tsv',
-	            **inputs.wildcards['ieeg']
-        	)
-	)
+        out_dir = directory(
+                            bids_folder(
+                                    root=config['output_dir'],
+                                    datatype='ieeg',
+                                    suffix='channels.tsv',
+                                    **inputs.wildcards['ieeg']
+                                )
+                            )
     # log:
     #     bids(
     #         root='/scratch/mcesped/HippiEEGAtlas/epochs/logs',
     #         suffix='epochs.log',
     #         **inputs.wildcards['bold']
     #     )
-    shell: 'python {params.script} -p {params.processes} -i {input.edf} -a {input.annot} -t {input.tsv} -o {output}'
+    # shell: 'python {params.script} -p {params.processes} -i {input.edf} -a {input.annot} -t {input.tsv} -o {output}'
+    script: join(workflow.basedir,'../code/epochs.py')
 
 rule all:
     input:

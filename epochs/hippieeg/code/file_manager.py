@@ -8,6 +8,10 @@ from functools import partial
 import traceback
 from multiprocessing.pool import Pool
 import re
+import pandas as pd
+import nibabel as nb
+import mne
+
 
 # Function to look for timestamps
 def extract_time_ids(epoch_id, time_vector, timestamps_array, srate):
@@ -23,6 +27,28 @@ def create_bipolar_comb(id, dict_key, channels_dict):
     chn2_label = dict_key+channels_dict[dict_key][id+1]
     return (bipolar_chn, chn1_label, chn2_label)
 
+# Function to extract position of bipolar channels
+def bipolar_info(id, dict_key, channels_dict, elec_pos):
+    # Bipolar channel label
+    bipolar_chn = dict_key+channels_dict[dict_key][id]+'-'+channels_dict[dict_key][id+1] 
+    # Channels' labels
+    chn1_label = dict_key+channels_dict[dict_key][id]
+    chn2_label = dict_key+channels_dict[dict_key][id+1]
+    # Extract positions
+    inf_chn1 = elec_pos.loc[elec_pos.label == chn1_label]
+    inf_chn2 = elec_pos.loc[elec_pos.label == chn2_label]
+    # print(inf_chn1)
+    data = {
+        'type': inf_chn1.type.values[0],
+        'group': inf_chn1.orig_group.values[0],
+        'label': bipolar_chn,
+        'x': (inf_chn1.x.values[0] + inf_chn2.x.values[0])/2,
+        'y': (inf_chn1.y.values[0] + inf_chn2.y.values[0])/2,
+        'z': (inf_chn1.z.values[0] + inf_chn2.z.values[0])/2
+    }
+    return data
+    
+
 # Function to create a bipolar channel list from 
 def create_bipolars(electrodes_df, processes):
     channels = dict((label,[]) for label in electrodes_df.orig_group.unique())
@@ -35,11 +61,20 @@ def create_bipolars(electrodes_df, processes):
     # print(channels)
     # Create new list
     bipolar_list = []
+    bipolar_info_dicts = []
     for key in  channels.keys():
+        # Extract bipolar list (original channels + bipolar channel)
         with Pool(processes=processes) as pool:
                 bipolar_list = bipolar_list + pool.map(partial(create_bipolar_comb, dict_key=key, channels_dict=channels), 
                                         list(range(len(channels[key])-1)))
-    return bipolar_list
+        # Extract bipolar channels information
+        with Pool(processes=processes) as pool:
+                bipolar_info_dicts = bipolar_info_dicts + pool.map(partial(bipolar_info, dict_key=key, channels_dict=channels,
+                                                          elec_pos=electrodes_df), list(range(len(channels[key])-1)))
+        bipolar_elec = pd.DataFrame(columns=np.concatenate((electrodes_df.columns[0:5],['group'])))
+        data = pd.DataFrame(bipolar_info_dicts)
+        bipolar_elec = pd.concat([bipolar_elec, data], ignore_index=True)
+    return bipolar_list, bipolar_elec
 
 # Function to extract info from each channel
 def extract_channel_data(chn_number, edf_file, srate_data, time_ids, bipolar_list):
@@ -47,18 +82,21 @@ def extract_channel_data(chn_number, edf_file, srate_data, time_ids, bipolar_lis
     # Get labels from original edf file
     channels_labels = edf_in.getSignalLabels()
     # Get indexes of channels
+    print('new iter')
     chn1_id = channels_labels.index(bipolar_list[chn_number][1])
     chn2_id = channels_labels.index(bipolar_list[chn_number][2])
-    signal_chn1 = edf_in.readSignal(chn1_id)
-    signal_chn2 = edf_in.readSignal(chn2_id)
     print(chn_number)
     chn_data = np.array([], dtype=float)
     for t_id in time_ids:
-        signal_bipolar = signal_chn1[t_id[0]:t_id[1]] - signal_chn2[t_id[0]:t_id[1]]
+        n_val = t_id[1]-t_id[0]
+        signal_chn1 = edf_in.readSignal(chn1_id, start=t_id[0], n=n_val)
+        signal_chn2 = edf_in.readSignal(chn2_id, start=t_id[0], n=n_val)
+        signal_bipolar = signal_chn1 - signal_chn2
         chn_data = np.hstack([chn_data, 
                             signal_bipolar, 
                             np.zeros(int(60*srate_data))])
     # Deallocate space in memory
+    edf_in.close()
     del signal_chn1
     del signal_chn2
     return chn_data
@@ -72,14 +110,84 @@ def extract_channel_header(chn_number, original_headers, bipolar_list, channels_
     chn_header['label'] = bipolar_list[chn_number][0]
     return chn_header
 
+# Function to get label map
+def get_colors_labels():
+    with open('/home/mcesped/scratch/HippiEEGAtlas/FreeSurferColorLUT.txt', 'r') as f:
+        raw_lut = f.readlines()
+
+    # read and process line by line
+    label_map = pd.DataFrame(columns=['Label', 'R', 'G', 'B'])
+    for line in raw_lut:
+        # Remove empty spaces
+        line = line.strip()
+        if not (line.startswith('#') or not line):
+            s = line.split()
+            # info = list(filter(None, info))
+            id = int(s[0])
+            info_s = {
+                'Label': s[1],
+                'R': int(s[2]),
+                'G': int(s[3]),
+                'B': int(s[4])
+            }
+            # info_s['A'] = 0 if (info_s['R']==0 & info_s['G']==0 & info_s['B']==0) else 255
+            info_s = pd.DataFrame(info_s, index=[id])
+            label_map = pd.concat([label_map,info_s], axis=0)
+        label_map[['R','G','B']] = label_map[['R','G','B']].astype('int64')
+    return label_map
+
+# Function to get label id based on parcellation obj
+def get_electrodes_id(parc, elec_df, non_cont_to_cont_tf):
+    # Load data of parcellations
+    data_parc = np.asarray(parc.dataobj)
+    # Coordinates in MRI RAS
+    mri_ras_mm = elec_df[['x','y','z']].values
+    # Transform from contrast mri ras to non-contrast MRI ras
+    mri_ras_mm = mne.transforms.apply_trans(non_cont_to_cont_tf, mri_ras_mm)
+    # To voxels
+    inv_affine = np.linalg.inv(parc.affine)
+    # here's where the interpolation should be performed!!
+    vox = np.round(mne.transforms.apply_trans(inv_affine, mri_ras_mm)).astype(int)
+    id = data_parc[vox[:,0], vox[:,1], vox[:,2]]
+    return id
+
+# Function to get rgb values for each contact
+def get_label_rgb(parc, elec_df, non_cont_to_cont_tf, label_map):
+    # vox, data_parc = ras2vox(parc, elec_df, non_cont_to_cont_tf)
+    id = get_electrodes_id(parc, elec_df, non_cont_to_cont_tf)
+    vals = label_map.loc[id, ['Label','R', 'G', 'B']].to_numpy()
+    vals = np.c_[id,vals]
+    vals = pd.DataFrame(data=vals, columns=['Label ID','Label','R', 'G', 'B'])
+    vals = pd.concat([elec_df, vals], axis=1)
+    return vals
+
+# Function to read matrix
+def readRegMatrix(trsfPath):
+	with open(trsfPath) as (f):
+		return np.loadtxt(f.readlines())
+
+# Function to create tsv with bipolar channels info
+def create_bipolar_tsv(parc_path, noncon_to_con_tf_path, bipolar_info, out_tsv_name):
+    # Only run if not generated previously
+    if not os.path.exists(out_tsv_name):
+        # Load labels from LUT file
+        labels = get_colors_labels()
+        # Load parcellation file
+        parc_obj = nb.load(parc_path)
+        data_parc = np.asarray(parc_obj.dataobj)
+        # The transform file goes from contrast to non-contrast. The tfm, when loaded in slicer actually goes
+        # from non-contrast to contrast but the txt is inversed!
+        t1_transform=readRegMatrix(noncon_to_con_tf_path)
+        # Create df
+        df = get_label_rgb(parc_obj, bipolar_info, t1_transform, labels)
+        df.to_csv(out_tsv_name, sep = '\t')
+
 # Function to create EDF file with bipolar data
-def create_EDF(edf_file, time_stamps, electrodes_position, out_path, processes):
+def create_EDF(edf_file, time_stamps, bipolar_channels, out_path, processes):
     try:
         edf_in = pyedflib.EdfReader(edf_file)
         # First import labels
         labels = edf_in.getSignalLabels()
-        # Create bipolar combinations
-        bipolar_channels = create_bipolars(electrodes_position, processes)
         # Create file:
         edf_out = pyedflib.EdfWriter(out_path, len(bipolar_channels), file_type=pyedflib.FILETYPE_EDFPLUS)
         # First set the data from the header of the edf file:
