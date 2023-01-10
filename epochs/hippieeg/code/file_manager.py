@@ -27,6 +27,21 @@ def create_bipolar_comb(id, dict_key, channels_dict):
     chn2_label = dict_key+channels_dict[dict_key][id+1]
     return (bipolar_chn, chn1_label, chn2_label)
 
+def create_bipolar_combi(id, bipolar_list):
+    return bipolar_list[id]
+
+# Function to discard 
+def apply_bipolar_criteria(df_bipolar, bipolar_list, processes):
+    non_white_matter_unknown_bool = df_bipolar['Label'].str.contains('White-Matter|Unknown',
+                                                                    case=False, regex=True)==False
+    ids = df_bipolar.loc[non_white_matter_unknown_bool, 'Label'].index.values.tolist()
+    print(ids)
+    # Extract bipolar list (original channels + bipolar channel)
+    with Pool(processes=processes) as pool:
+            filtered_list = pool.map(partial(create_bipolar_combi, bipolar_list=bipolar_list), 
+                                    ids)
+    return filtered_list
+
 # Function to extract position of bipolar channels
 def bipolar_info(id, dict_key, channels_dict, elec_pos):
     # Bipolar channel label
@@ -168,19 +183,18 @@ def readRegMatrix(trsfPath):
 
 # Function to create tsv with bipolar channels info
 def create_bipolar_tsv(parc_path, noncon_to_con_tf_path, bipolar_info, out_tsv_name):
-    # Only run if not generated previously
-    if not os.path.exists(out_tsv_name):
-        # Load labels from LUT file
-        labels = get_colors_labels()
-        # Load parcellation file
-        parc_obj = nb.load(parc_path)
-        data_parc = np.asarray(parc_obj.dataobj)
-        # The transform file goes from contrast to non-contrast. The tfm, when loaded in slicer actually goes
-        # from non-contrast to contrast but the txt is inversed!
-        t1_transform=readRegMatrix(noncon_to_con_tf_path)
-        # Create df
-        df = get_label_rgb(parc_obj, bipolar_info, t1_transform, labels)
-        df.to_csv(out_tsv_name, sep = '\t')
+    # Load labels from LUT file
+    labels = get_colors_labels()
+    # Load parcellation file
+    parc_obj = nb.load(parc_path)
+    data_parc = np.asarray(parc_obj.dataobj)
+    # The transform file goes from contrast to non-contrast. The tfm, when loaded in slicer actually goes
+    # from non-contrast to contrast but the txt is inversed!
+    t1_transform=readRegMatrix(noncon_to_con_tf_path)
+    # Create df
+    df = get_label_rgb(parc_obj, bipolar_info, t1_transform, labels)
+    df.to_csv(out_tsv_name, sep = '\t')
+    return df
 
 # Function to create EDF file with bipolar data
 def create_EDF(edf_file, time_stamps, bipolar_channels, out_path, processes):

@@ -3,7 +3,7 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import traceback
-from file_manager import create_EDF, create_bipolars, create_bipolar_tsv
+from file_manager import create_EDF, create_bipolars, create_bipolar_tsv, apply_bipolar_criteria
 import argparse
 import re
 import shutil
@@ -59,8 +59,9 @@ try:
             if size_edf <= 0.9*int(snakemake.params.mem):
                 # Copy file to local scratch
                 print('caca2')
-                shutil.copy(edf, '/tmp/')
                 new_edf ='/tmp/'+re.search(pattern_complete, edf).group()
+                if not os.path.exists(new_edf): # REMOVE THE IF
+                    shutil.copy(edf, '/tmp/')
             # Build output folder/file for edf file and tsv
             output_path_ieeg = re.search(pattern_dir, edf).group()
             out_file_name = re.search(pattern=pattern_ieeg, string=edf).group()
@@ -80,9 +81,16 @@ try:
             elec_pos = pd.read_csv(tsv_file, sep='\t')
             # Create bipolar combinations
             bipolar_channels, bipolar_info_df = create_bipolars(elec_pos, processes)
+            print(bipolar_channels)
             # Create tsv file with information about bipolar channels
             print('here')
-            create_bipolar_tsv(parc_path, noncon_to_con_tf_path, bipolar_info_df, out_tsv)
+            # Only run if not generated previously
+            if not os.path.exists(out_tsv):
+                df_bipolar = create_bipolar_tsv(parc_path, noncon_to_con_tf_path, bipolar_info_df, out_tsv)
+
+            # Discard data from white matter
+            bipolar_channels = apply_bipolar_criteria(df_bipolar, bipolar_channels, processes)
+            print(bipolar_channels)
             # Here call function to create new EDF file
             if (new_edf == None):
                 create_EDF(edf, time_stamps, bipolar_channels, out_path_name, processes)
