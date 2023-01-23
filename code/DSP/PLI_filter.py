@@ -1,3 +1,11 @@
+#    Author: Mauricio Cespedes Tenorio <mcespedes99@gmail.com>
+#    This is the Python version of the code from: 
+#    http://audition.ens.fr/adc/NoiseTools/src/NoiseTools/nt_zapline.m
+#    which is an implementation of the proposed algorithm in,
+#    Alain de Cheveigné,
+#    ZapLine: A simple and effective method to remove power line artifacts,
+#    NeuroImage, Volume 207, 2020, 116356, ISSN 1053-8119,
+#    https://doi.org/10.1016/j.neuroimage.2019.116356.
 import numpy as np
 import scipy.signal
 def square_filt(x,T,nIterations=1):
@@ -179,6 +187,9 @@ def eigen(A):
 
 import numpy as np
 def dss(c0,c1):
+  # Refer to de Cheveigné A, Parra LC. Joint decorrelation, a versatile
+  # tool for multichannel data analysis. Neuroimage. 2014 Sep;98:487-505.
+  # doi: 10.1016/j.neuroimage.2014.05.068. Epub 2014 Jun 2. PMID: 24990357.
   #[todss,pwr1,pwr2]=nt_dss0(c0,c1,keep1,keep2) - dss from covariance
   #
   # todss: matrix to convert data to normalized DSS components
@@ -243,6 +254,8 @@ def denoise_PCA(x, ref):
   cref = ref.T @ ref
   cref = cref / len(x)
 
+  # The crosscov matrix would be just a way of measuring how each channel of x
+  # related to the reference signal
   cxref = crosscov(x,ref)
   cxref = cxref/len(x)
 
@@ -266,6 +279,11 @@ def denoise_PCA(x, ref):
     r = cxref
 
   # TSPCA
+  # Then here r is just how each channel from x (which represents the original noise) variates 
+  # compare to ref (which is just a mx1 signal that represents the best the PL
+  # noise accross channels). So it just means the weights of ref to 'reconstruct'
+  # each channel from x. The result of ref*r would be constructing a signal per channel
+  # that represents the best x based only in ref, which is the PL noise!!
   z = ref @ r
   # z = z/2
   y = x-z
@@ -337,9 +355,10 @@ def zapline(x, fline, srate, nremove=1, p={}, filt=2):
   # In python, each column of eigvecs represent an eigenvector. So you have to 
   # multiple x * eigvecs. Easy way to say it, a chunk version of eigvecs could
   # be nxk so the only way to multiply it is x*eigvecs
-  xxxx = (x_rem) @ (eigvecs)  
+  # This just rotates the data according to the principal components
+  xxxx = (x_rem) @ (eigvecs) 
   
-  print('caca')
+  print('ca')
   # DSS to isolate line components from residual:
   nHarmonics=np.floor((1/2)/fline);
   [c0,c1]=bias_fft(xxxx, fline*np.arange(1,nHarmonics+1), p['nfft']);
@@ -350,7 +369,9 @@ def zapline(x, fline, srate, nremove=1, p={}, filt=2):
   print('2')
   todss = dss(c0,c1);
   print('3')
-  xxxx= xxxx @ todss[:,0:nremove] # line-dominated components
+  # This would be the projection of the noise to the main component of the biased
+  # noise, which should represent the line noise.
+  xxxx= xxxx @ todss[:,0:nremove] # line-dominated components. 
   # return xxxx
   # Denoise
   xxx =denoise_PCA(x-xx,xxxx); # project them out
