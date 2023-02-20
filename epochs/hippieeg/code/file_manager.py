@@ -91,7 +91,7 @@ def create_bipolars(electrodes_df, processes):
         bipolar_elec = pd.concat([bipolar_elec, data], ignore_index=True)
     return bipolar_list, bipolar_elec
 
-# Function to extract info from each channel
+# Function to extract info from each channel - bipolar
 def extract_channel_data(chn_number, edf_file, srate_data, time_ids, bipolar_list):
     edf_in = pyedflib.EdfReader(edf_file)
     # Get labels from original edf file
@@ -114,6 +114,21 @@ def extract_channel_data(chn_number, edf_file, srate_data, time_ids, bipolar_lis
     edf_in.close()
     del signal_chn1
     del signal_chn2
+    return chn_data
+
+# Function to extract info from each channel - unipolar
+def extract_channel_data_uni(chn_number, edf_file, srate_data, time_ids):
+    edf_in = pyedflib.EdfReader(edf_file)
+    chn_data = np.array([], dtype=float)
+    for t_id in time_ids:
+        n_val = t_id[1]-t_id[0]
+        signal = edf_in.readSignal(chn_number, start=t_id[0], n=n_val)
+        chn_data = np.hstack([chn_data, 
+                            signal, 
+                            np.zeros(int(60*srate_data))])
+    # Deallocate space in memory
+    edf_in.close()
+    del signal
     return chn_data
 
 # Function to extract headers for bipolar channels
@@ -203,7 +218,8 @@ def create_EDF(edf_file, time_stamps, bipolar_channels, out_path, processes):
         # First import labels
         labels = edf_in.getSignalLabels()
         # Create file:
-        edf_out = pyedflib.EdfWriter(out_path, len(bipolar_channels), file_type=pyedflib.FILETYPE_EDFPLUS)
+        #edf_out = pyedflib.EdfWriter(out_path, len(bipolar_channels), file_type=pyedflib.FILETYPE_EDFPLUS)
+        edf_out = pyedflib.EdfWriter(out_path, len(labels), file_type=pyedflib.FILETYPE_EDFPLUS)
         # First set the data from the header of the edf file:
         edf_out.setHeader(edf_in.getHeader())
         headers_orig = edf_in.getSignalHeaders()
@@ -220,6 +236,8 @@ def create_EDF(edf_file, time_stamps, bipolar_channels, out_path, processes):
         # Relative initial time for epochs
         t_0 = t[np.abs(np.subtract(t,time_stamps[0])).argmin()]
         edf_out.writeAnnotation(0, -1, "Recording starts")
+        # Headers for unipolar case
+        headers = edf_in.getSignalHeaders() ##### EEEEEEEEEEEEEERAAAAAASEEEEEEE
         # Close file
         edf_in.close()
         # Create time ids
@@ -237,19 +255,25 @@ def create_EDF(edf_file, time_stamps, bipolar_channels, out_path, processes):
         # Deallocate space in memory
         del t
         # Extract channel information:
-        chn_lists = range(len(bipolar_channels))
+        chn_lists = range(len(labels))
+        # chn_lists = range(len(bipolar_channels)) #for bipolar
         print('Channel part')
         # Create bipolar signals:
+        # with Pool(processes=processes) as pool2:
+        #     channel_data = pool2.map(partial(extract_channel_data, edf_file=edf_file, 
+        #                                     srate_data=srate, time_ids=t_ids,
+        #                                     bipolar_list=bipolar_channels), chn_lists)
+        # # Create headers:
+        # with Pool(processes=processes) as pool2:
+        #     headers = pool2.map(partial(extract_channel_header, 
+        #                               original_headers=headers_orig,
+        #                               bipolar_list=bipolar_channels,
+        #                               channels_labels=labels), chn_lists)
+        # Unipolar case:
         with Pool(processes=processes) as pool2:
-            channel_data = pool2.map(partial(extract_channel_data, edf_file=edf_file, 
-                                            srate_data=srate, time_ids=t_ids,
-                                            bipolar_list=bipolar_channels), chn_lists)
-        # Create headers:
-        with Pool(processes=processes) as pool2:
-            headers = pool2.map(partial(extract_channel_header, 
-                                      original_headers=headers_orig,
-                                      bipolar_list=bipolar_channels,
-                                      channels_labels=labels), chn_lists)
+            channel_data = pool2.map(partial(extract_channel_data_uni, edf_file=edf_file, 
+                                            srate_data=srate, time_ids=t_ids), chn_lists)
+        
         # Edit headers to make them compliant with edf files
         for header in headers:
             header['physical_max'] = int(header['physical_max'])
