@@ -293,6 +293,7 @@ def _interpolate_bads_seeg(inst, picks=None):
     """
     from scipy.spatial.distance import pdist, squareform
     from mne.preprocessing.nirs import _validate_nirs_info
+    from mne.io.pick import pick_channels
 
     if len(pick_types(inst.info, seeg=True, exclude=())) == 0:
         return
@@ -314,28 +315,24 @@ def _interpolate_bads_seeg(inst, picks=None):
     locs3d = np.array([ch['loc'][:3] for ch in chs])
 
     dist = pdist(locs3d)
-    dist = squareform(dist)    dist = pdist(locs3d)
     dist = squareform(dist)
-
-    for bad in picks_bad:
-        dists_to_bad = dist[bad]
-        # Ignore distances to self
-        dists_to_bad[dists_to_bad == 0] = np.inf
-        # Ignore distances to other bad channels
-        dists_to_bad[bads_mask] = np.inf
-        # Find closest remaining channels for same frequency
-        closest_idx = np.argmin(dists_to_bad) + (bad % 2)
-        inst._data[bad] = inst._data[closest_idx]
-
-    for bad in picks_bad:
-        dists_to_bad = dist[bad]
-        # Ignore distances to self
-        dists_to_bad[dists_to_bad == 0] = np.inf
-        # Ignore distances to other bad channels
-        dists_to_bad[bads_mask] = np.inf
-        # Find closest remaining channels for same frequency
-        closest_idx = np.argmin(dists_to_bad) + (bad % 2)
-        inst._data[bad] = inst._data[closest_idx]
+    try:
+        for bad in picks_bad:
+            dists_to_bad = dist[bad]
+            # Ignore distances to self
+            dists_to_bad[dists_to_bad == 0] = np.inf
+            # Ignore distances to other bad channels
+            dists_to_bad[bads_mask] = np.inf
+            # Find closest remaining channels for same frequency
+            closest_idx = np.argmin(dists_to_bad) + (bad % 2)
+            inst._data[:,bad,:] = inst._data[:,closest_idx,:]
+    except:
+        print(picks_bad)
+        print(bad)
+        print(inst._data.shape)
+        print(closest_idx)
+        print(dists_to_bad)
+        raise Exception
 
 
     return inst
