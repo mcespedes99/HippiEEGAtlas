@@ -16,3 +16,4 @@ epochs/.snakebids
 epochs/config/
 code/DSP/test2.edf
 code/Position/output.html
+*.ipynb_checkpoints/

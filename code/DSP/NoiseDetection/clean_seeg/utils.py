@@ -16,7 +16,7 @@ def get_chn_positions(chn_csv_path, trsfPath=None):
     -------
         
     """
-    elec_pos = pd.read_csv(chn_csv_path)
+    elec_pos = pd.read_csv(chn_csv_path, sep='\t')
     chn_pos = {}
     for i in np.arange(len(elec_pos)):
         label = elec_pos.loc[[i], ['label']].values[0][0]
@@ -27,6 +27,23 @@ def get_chn_positions(chn_csv_path, trsfPath=None):
         pos = pos.tolist()
         chn_pos[label] = pos
     return chn_pos
+
+def get_chn_labels(chn_csv_path):
+    import numpy as np
+    import pandas as pd
+    """Gets label for each electrode.
+    Parameters
+    ----------
+    ch_csv_path : str
+        Path to csv containing electrodes positions.
+
+    Returns : list with labels.
+    -------
+        
+    """
+    elec_info = pd.read_csv(chn_csv_path, sep='\t')
+    labels = elec_info['label'].values.tolist()
+    return labels
 
 def get_montage(ch_pos, subject, subjects_dir):
     import mne
@@ -97,7 +114,7 @@ def contrast_to_non_contrast(pnt, tfm):
     mri_ras_mm = mne.transforms.apply_trans(tfm, pnt)
     return mri_ras_mm
 
-def get_orig_data(epoch_path, chn_pos):
+def get_orig_data(epoch_path):
     """Get labels and start-end timestamps for each epoch.
     """
     import pyedflib
@@ -130,6 +147,7 @@ def segment_signal(signal, srate, time_epoch=5):
     n_epoch = int(time_epoch*srate) # 5 seconds by default
     # Initialize segmented signal
     signal_epoch = np.zeros((int(signal.shape[1]/n_epoch), signal.shape[0], n_epoch))
+    n_missed = signal.shape[1] - int(signal.shape[1]/n_epoch)
     id = 0
     start_id = []
     end_id = []
@@ -144,114 +162,109 @@ def segment_signal(signal, srate, time_epoch=5):
         'Start ID': start_id,
         'End ID': end_id
         }
-    return signal_epoch, epochs_ids
-
-def create_mne_epochs(signal, chn_labels, srate, montage, time_epoch=5):
-    import numpy as np
-    import mne
-    # Divide the signal into small epochs
-    signal_epoch, epochs_ids = segment_signal(signal, srate, time_epoch)
-    # Create information for MNE structure
-    info = mne.create_info(ch_names=chn_labels,
-                        ch_types=['seeg'] * len(chn_labels),
-                        sfreq=srate)
-    # Create MNE epoch array 
-    mne_epochs = mne.EpochsArray(signal_epoch, info)
-    # Set montage
-    mne_epochs.set_montage(montage)
-    return mne_epochs, epochs_ids
-        
-def run_autoreject(mne_epoch_array, exclude = []):
-    from autoreject.autoreject import AutoReject, compute_thresholds
-    import mne
-    import numpy as np
-    # Create Autoreject instance
-    ar = AutoReject(random_state=42, n_jobs=-1, verbose=True)
-    # Run autoreject
-    epochs_ar, reject_log = ar.fit_transform(mne_epoch_array, return_log=True)
-    # Create 'clean'/'noisy' labels (n_epochs x n_channels)
-    noise_labels = np.copy(reject_log.labels).astype('object')
-    # Manage possible nan values 
-    np.nan_to_num(noise_labels, copy=False)
-    # Include bad epochs 
-    noise_labels[reject_log.bad_epochs] = 1
-    # Define dict for possible values
-    noise_map = {0: 'C', 1: 'N', 2: 'N'} #(0.6, 0.6, 0.6, 1.0)
-    for key in list(noise_map.keys()):
-        noise_labels[noise_labels==key] = noise_map[key]
-    return epochs_ar, noise_labels
+    return signal_epoch, epochs_ids, n_missed
+    
     
 
+# Extra function, not used!
 def clean_signal(edf_path, chn_csv_path, subject, subjects_dir, trsfPath=None, time_epoch=5):
     import pyedflib
     import numpy as np
     import pandas as pd
+    import traceback
     # Begin by getting the position of the electrodes in RAS space
     chn_pos = get_chn_positions(chn_csv_path, trsfPath)
     # Extract the labels and timestamps required
-    labels, timestamps_epochs = get_orig_data(edf_path, chn_pos)
-    # Defining length of epochs based on first epoch
+    labels, timestamps_epochs = get_orig_data(edf_path)
+    # Defining start and end time of first epoch
     t_init = timestamps_epochs[0,0]
     t_end = timestamps_epochs[0,1]
-    length_epoch = t_end-t_init
     # Open edf file
     edf_in = pyedflib.EdfReader(edf_path)
-    # Channels to extract
-    keys = list(chn_pos.keys())
-    # Sample rate
-    srate = edf_in.getSampleFrequencies()[0]/edf_in.datarecord_duration
-    # Number of samples
-    N=edf_in.getNSamples()[0]
-    # Create time vector using srate
-    t = np.arange(0, N)/srate
-    # Create sEEG montage
-    montage = get_montage(chn_pos, subject, subjects_dir)
-    # Initiate clean signal
-    clean = np.array([]).reshape(len(keys),0)
-    # Initiate csv epoch file
-    cols = ['Epoch #', 'Start ID', 'End ID']+keys
-    df_epochs = pd.DataFrame(columns=cols)
-    # Last epoch number
-    last_epoch = 0
-    # Run the algorithm per epoch
-    n_epochs = timestamps_epochs.shape[0]
-    for epoch_id in np.arange(n_epochs):
-        t_init = timestamps_epochs[epoch_id,0]
-        t_init_next = np.max(timestamps_epochs[epoch_id,0], t_init+length_epoch)
-        # Find idx for t_init
+    try:
+        # Channels to extract
+        keys = list(chn_pos.keys())
+        # Sample rate
+        srate = edf_in.getSampleFrequencies()[0]/edf_in.datarecord_duration
+        # Number of samples
+        N=edf_in.getNSamples()[0]
+        # Create time vector using srate
+        t = np.arange(0, N)/srate
+        # Define length of epochs based on the first one
         t_init_id = np.argmin((np.abs(t-t_init)))
-        # Create signal for that epoch
-        signal = np.array([], dtype=np.int64).reshape(0,length_epoch)
-        signal_not_clean = np.array([], dtype=np.int64).reshape(0,length_epoch)
-        # Extract signal per channel
-        for chan in keys:
-            id_ch = labels.index(chan)
-            chn_sig = edf_in.readSignal(id_ch, start = t_init_id, n = t_init_next)
-            chn_sig_epoch = chn_sig[0:length_epoch]
-            signal = np.vstack([signal, chn_sig_epoch])
-            signal_not_clean = np.vstack([signal_not_clean, chn_sig[length_epoch:]])
-        # Create MNE epochs
-        mne_epochs, epochs_ids = create_mne_epochs(signal, keys, srate, montage, time_epoch)
-        # Update IDs
-        start_IDs = epochs_ids['Start ID']+t_init_id
-        end_IDs = epochs_ids['End ID']+t_init_id
-        # Epochs #s
-        epoch_num = np.arange(last_epoch, last_epoch+len(start_IDs))
-        last_epoch = last_epoch+len(start_IDs)
-        # Run autoreject
-        epochs_ar, noise_labels = run_autoreject(mne_epochs)
-        # Create noise df
-        IDs_array = np.array([start_IDs,end_IDs]).T
-        noise_array = np.c_[epoch_num, IDs_array, noise_labels]
-        df_tmp = pd.DataFrame(data = noise_array, columns = cols)
-        df_epochs = pd.concat([df_epochs, df_tmp])
+        t_end_id = np.argmin((np.abs(t-t_end)))
+        length_epoch = t_end_id-t_init_id
+        print(length_epoch)
+        # Create sEEG montage
+        montage = get_montage(chn_pos, subject, subjects_dir)
+        # Initiate clean signal
+        clean = np.array([]).reshape(len(keys),0)
+        # Initiate csv epoch file
+        cols = ['Epoch #', 'Start ID', 'End ID']+keys
+        df_epochs = pd.DataFrame(columns=cols)
+        # Last epoch number
+        last_epoch = 0
+        # Run the algorithm per epoch
+        n_epochs = timestamps_epochs.shape[0]
+        for epoch_id in np.arange(n_epochs):
+            t_init = timestamps_epochs[epoch_id,0]
+            # Find idx for t_init
+            t_init_id = np.argmin((np.abs(t-t_init)))
+            # Find init for next epoch
+            if epoch_id < n_epochs-1:
+                t_init_next = timestamps_epochs[epoch_id+1,0]
+                t_init_next_id = np.argmin((np.abs(t-t_init_next)))
+            else:
+                t_init_next_id = N
+            # Create signal for that epoch
+            signal = np.array([], dtype=np.int64).reshape(0,length_epoch)
+            n_not_clean = t_init_next_id - (t_init_id+length_epoch)
+            signal_not_clean = np.array([], dtype=np.int64).reshape(0,n_not_clean)
+            # Extract signal per channel
+            for chan in keys:
+                id_ch = labels.index(chan)
+                n_extract = t_init_next_id - t_init_id
+                chn_sig = edf_in.readSignal(id_ch, start = t_init_id, n = n_extract)
+                chn_sig_epoch = chn_sig[0:length_epoch]
+                signal = np.vstack([signal, chn_sig_epoch])
+                signal_not_clean = np.vstack([signal_not_clean, chn_sig[length_epoch:]])
+            edf_in.close()
+            # Create MNE epochs
+            mne_epochs, epochs_ids, n_missed = create_mne_epochs(signal, keys, srate, montage, time_epoch)
+            # Update not clean signal if some segments where missed
+            if n_missed != 0:
+                # print(n_missed)
+                # print(signal[:,-n_missed:])
+                sig_missed = signal[:,-n_missed]
+                if sig_missed.ndim == 1:
+                    sig_missed = sig_missed.reshape(-1,1)
+                signal_not_clean = np.hstack([sig_missed, signal_not_clean])
+            # Update IDs
+            start_IDs = epochs_ids['Start ID']+t_init_id
+            end_IDs = epochs_ids['End ID']+t_init_id
+            # Epochs #s
+            epoch_num = np.arange(last_epoch, last_epoch+len(start_IDs))
+            last_epoch = last_epoch+len(start_IDs)
+            # Run autoreject
+            epochs_ar, noise_labels = run_autoreject(mne_epochs)
+            # Create noise df
+            IDs_array = np.array([start_IDs,end_IDs]).T
+            noise_array = np.c_[epoch_num, IDs_array, noise_labels]
+            df_tmp = pd.DataFrame(data = noise_array, columns = cols)
+            df_epochs = pd.concat([df_epochs, df_tmp])
 
-        # Reshape to n_chn x n_time
-        clean_sig = epochs_ar.get_data()
-        clean_sig = clean_sig.swapaxes(0,1).reshape(2,-1)
-        # Attach the non-clean part of the signal
-        clean_sig = np.hstack([clean_sig, signal_not_clean])
-        # Update clean signal
-        clean = np.hstack([clean, clean_sig])
-
+            # Reshape to n_chn x n_time
+            clean_sig = epochs_ar.get_data()
+            print(clean_sig.shape)
+            clean_sig = clean_sig.swapaxes(0,1).reshape(len(keys),-1)
+            # Attach the non-clean part of the signal
+            clean_sig = np.hstack([clean_sig, signal_not_clean])
+            print(clean_sig.shape)
+            # Update clean signal
+            clean = np.hstack([clean, clean_sig])
+            print(clean.shape)
         return clean, df_epochs
+    except:
+        edf_in.close()
+        print(traceback.format_exc())
+        return None
