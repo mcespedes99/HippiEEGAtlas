@@ -3,7 +3,7 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import traceback
-from file_manager import create_EDF, create_bipolars, create_bipolar_tsv, apply_bipolar_criteria
+from file_manager import create_EDF
 import argparse
 import re
 import shutil
@@ -11,13 +11,9 @@ import os
 
 input_files = snakemake.input.edf
 annot_files = snakemake.input.annot
-tsv_file = snakemake.input.tsv
 processes = int(snakemake.params.processes)
 output_dir = snakemake.output.out_dir
-parc_path = snakemake.input.parc
-noncon_to_con_tf_path = snakemake.input.tf
 
-print(tsv_file)
 print(output_dir)
 # Import file:
 try:
@@ -58,45 +54,24 @@ try:
             new_edf = None
             if size_edf <= 0.9*int(snakemake.params.mem):
                 # Copy file to local scratch
-                print('caca2')
+                print('here')
                 new_edf ='/tmp/'+re.search(pattern_complete, edf).group()
                 if not os.path.exists(new_edf): # REMOVE THE IF
                     shutil.copy(edf, '/tmp/')
             # Build output folder/file for edf file and tsv
             output_path_ieeg = re.search(pattern_dir, edf).group()
             out_file_name = re.search(pattern=pattern_ieeg, string=edf).group()
-            out_tsv = re.search(r'sub-\d{3}', edf).group()+'_space-native_SEEGA.tsv'
-            if output_dir.endswith('/'):
-                output_path_ieeg = output_dir + output_path_ieeg
-                os.makedirs(output_path_ieeg)
-                out_path_name = output_path_ieeg+out_file_name+'_epoch.edf'
-                out_tsv = output_dir + out_tsv
-            else:
-                output_path_ieeg = output_dir+'/'+output_path_ieeg
-                os.makedirs(output_path_ieeg)
-                out_path_name = output_path_ieeg+out_file_name+'_epoch.edf'
-                out_tsv = output_dir + '/' + out_tsv
-
-            # Extract info about electrodes positions
-            elec_pos = pd.read_csv(tsv_file, sep='\t')
-            # Create bipolar combinations
-            bipolar_channels, bipolar_info_df = create_bipolars(elec_pos, processes)
-            print(bipolar_channels)
-            # Create tsv file with information about bipolar channels
-            print('here')
-            # Only run if not generated previously
-            if not os.path.exists(out_tsv):
-                df_bipolar = create_bipolar_tsv(parc_path, noncon_to_con_tf_path, bipolar_info_df, out_tsv)
-
-            # Discard data from white matter
-            bipolar_channels = apply_bipolar_criteria(df_bipolar, bipolar_channels, processes)
-            print(bipolar_channels)
+            output_path_ieeg = os.path.join(output_dir, output_path_ieeg)
+            os.makedirs(output_path_ieeg)
+            out_path_name = output_path_ieeg+out_file_name+'_epoch.edf'
+            print('here2')
+            
             # Here call function to create new EDF file
             if (new_edf == None):
-                create_EDF(edf, time_stamps, bipolar_channels, out_path_name, processes)
+                create_EDF(edf, time_stamps, out_path_name, processes)
             else:
                 print('aqui')
-                create_EDF(new_edf, time_stamps, bipolar_channels, out_path_name, processes)
+                create_EDF(new_edf, time_stamps, out_path_name, processes)
                 print('delete')
                 os.remove(new_edf)
 except FileNotFoundError:

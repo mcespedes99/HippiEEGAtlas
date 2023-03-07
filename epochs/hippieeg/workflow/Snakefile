@@ -6,9 +6,9 @@ from os.path import join
 from itertools import compress
 import fnmatch
 import numpy as np
-import sys
-sys.path.append('/scratch/mcesped/HippiEEGAtlas/epochs/hippieeg/code')
-from file_manager import bids_folder
+# import sys
+# sys.path.append('/scratch/mcesped/code/HippiEEGAtlas/epochs/hippieeg/code')
+from scripts.file_manager import bids_folder
 
 
 configfile: workflow.source_path('../config/snakebids.yml')
@@ -60,20 +60,15 @@ rule epochs:
                                         [True if subj == wildcards.subject else False for subj in inputs.zip_lists['annotations']['subject']])),
                                 run = list(compress(inputs.zip_lists['annotations']['run'], 
                                         [True if subj == wildcards.subject else False for subj in inputs.zip_lists['annotations']['subject']])),
-                                allow_missing=True),
-        tsv = inputs.path['seega_tsv'],
-        parc = inputs.path['parc'],
-        tf = inputs.path['tf']
+                                allow_missing=True)
     params:
         script = join(workflow.basedir,'../code/epochs.py'),
-        processes = 16,
-        mem = 64000
+        processes = config['processes'],
+        mem = config['memory']
     output:
         out_dir = directory(
                             bids_folder(
                                     root=config['output_dir'],
-                                    datatype='ieeg',
-                                    suffix='channels.tsv',
                                     **inputs.wildcards['ieeg']
                                 )
                             )
@@ -84,7 +79,7 @@ rule epochs:
     #         **inputs.wildcards['bold']
     #     )
     # shell: 'python {params.script} -p {params.processes} -i {input.edf} -a {input.annot} -t {input.tsv} -o {output}'
-    script: join(workflow.basedir,'../code/epochs.py')
+    script: join(workflow.basedir,'scripts/epochs.py')
 
 rule all:
     input:
