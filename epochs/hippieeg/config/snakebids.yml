@@ -3,7 +3,6 @@ bids_dir_tsv: '/home/mcesped/projects/ctb-akhanf/cfmm-bids/Khan/clinical_imaging
 # output_dir: '/scratch/mcesped/epochs/results'
 
 # Resources
-processes: 16
 memory: 64000
 
 

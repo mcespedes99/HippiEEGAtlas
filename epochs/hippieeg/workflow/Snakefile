@@ -6,9 +6,7 @@ from os.path import join
 from itertools import compress
 import fnmatch
 import numpy as np
-# import sys
-# sys.path.append('/scratch/mcesped/code/HippiEEGAtlas/epochs/hippieeg/code')
-from scripts.file_manager import bids_folder
+import pandas as pd
 
 
 configfile: workflow.source_path('../config/snakebids.yml')
@@ -28,57 +26,77 @@ subj_session_list = list(zip(inputs.zip_lists['ieeg']['subject'],inputs.zip_list
 
 #this adds constraints to the bids naming
 wildcard_constraints:  **snakebids.get_wildcard_constraints(config['pybids_inputs'])
-# print(inputs.path)
-# print(inputs.zip_lists['bold']['run'])
-# print(inputs.zip_lists['bold']['task'])
-# print(subj_session_list)
-# print(inputs.zip_lists['bold']['subject'])
-# print(inputs.zip_lists['bold']['session'])
 
-# def get_edf_files(wildcards):
-#     files = []
-#     for root, dirs, files in os.walk(config["bids_dir"]+'/bids/'+f'/sub-{wildcards.subject}/'):
-#         for name in files:
-#             if fnmatch.fnmatch(name, '*_ieeg.edf'):
-#                 files.append(os.path.join(root, name))
-#     return files
+def get_inputs(input_path, **zip_lists):
+    # Possible edf files
+    annot_files = expand(
+                input_path,
+                zip,
+                **zip_lists
+            )
+    # print(annot_files)
+    # Convert zip list to tuples and add to a set
+    set_wildcards_vals = set()
+    list_wildcards_vals = []
+    values_wildcards = list(zip_lists.values())
+    for idx in range(len(annot_files)):
+        tmp_tuple = tuple([value[idx] for value in values_wildcards])
+        set_wildcards_vals.add(tmp_tuple)
+        # Also save in list to use it in the filtering (an ordered list is needed)
+        list_wildcards_vals.append(tmp_tuple)
+
+    # Create remove set
+    remove_set = set()
+    # Check annotation files to filter inputs
+    for idx, annot_file in enumerate(annot_files):
+        # Open annotation file to check if any event is in the data
+        annot = pd.read_csv(annot_file, sep='\t')
+        # Find time stamps indexes where the 'awake trigger' event is happening
+        # returns True on all the indexes if no event is found
+        cond = ~annot['event'].str.contains('awake trigger', case=False)
+        # If no event is found, then add to remove set
+        if cond.all():
+            remove_set.add(list_wildcards_vals[idx])
+    # Get filtered values
+    out_wildcards_vals = set_wildcards_vals-remove_set
+
+    # First get dict keys
+    out_ziplist_keys = list(zip_lists.keys())
+    # Convert the set to list of lists
+    out_ziplist_vals = []
+    for key_id in range(len(out_ziplist_keys)):
+        out_ziplist_vals.append([tuple_val[key_id] for tuple_val in out_wildcards_vals])
+    # Construct dictionary
+    out_ziplist = dict(zip(out_ziplist_keys, out_ziplist_vals))
+    return out_ziplist
+
+# Get filtered ziplist based on annotations of interest
+filtered_ziplist = get_inputs(inputs.path['annotations'], **inputs.zip_lists['annotations'])
+
+
 #---- end snakebids boilerplate ------------------------------------------------
 rule epochs:
     input: 
-        edf = lambda wildcards: expand(inputs.path['ieeg'], zip,
-	                        session = list(compress(inputs.zip_lists['ieeg']['session'],
-                                        [True if subj == wildcards.subject else False for subj in inputs.zip_lists['ieeg']['subject']])),
-                                task = list(compress(inputs.zip_lists['ieeg']['task'], 
-                                        [True if subj == wildcards.subject else False for subj in inputs.zip_lists['ieeg']['subject']])),
-                                run = list(compress(inputs.zip_lists['ieeg']['run'], 
-                                        [True if subj == wildcards.subject else False for subj in inputs.zip_lists['ieeg']['subject']])),
-                                allow_missing=True),
-        annot = lambda wildcards: expand(inputs.path['annotations'], zip,
-	                        session = list(compress(inputs.zip_lists['annotations']['session'],
-                                        [True if subj == wildcards.subject else False for subj in inputs.zip_lists['annotations']['subject']])),
-                                task = list(compress(inputs.zip_lists['annotations']['task'], 
-                                        [True if subj == wildcards.subject else False for subj in inputs.zip_lists['annotations']['subject']])),
-                                run = list(compress(inputs.zip_lists['annotations']['run'], 
-                                        [True if subj == wildcards.subject else False for subj in inputs.zip_lists['annotations']['subject']])),
-                                allow_missing=True)
+        edf = inputs.path['ieeg'],
+        annot = inputs.path['annotations'],
     params:
         script = join(workflow.basedir,'../code/epochs.py'),
-        processes = config['processes'],
+        processes = workflow.cores,
         mem = config['memory']
     output:
-        out_dir = directory(
-                            bids_folder(
-                                    root=config['output_dir'],
-                                    **inputs.wildcards['ieeg']
-                                )
-                            )
-    # log:
-    #     bids(
-    #         root='/scratch/mcesped/HippiEEGAtlas/epochs/logs',
-    #         suffix='epochs.log',
-    #         **inputs.wildcards['bold']
-    #     )
-    # shell: 'python {params.script} -p {params.processes} -i {input.edf} -a {input.annot} -t {input.tsv} -o {output}'
+        out_edf = bids(
+                        root='bids',
+                        datatype='ieeg',
+                        suffix='ieeg_epoch.edf',
+                        **inputs.wildcards['ieeg']
+                  )
+    threads: workflow.cores # Set equal to the number of cores to avoid parallel runs
+    log:
+        bids(
+            root='logs',
+            suffix='epochs.log',
+            **inputs.wildcards['ieeg']
+        ),
     script: join(workflow.basedir,'scripts/epochs.py')
 
 rule all:
@@ -89,6 +107,6 @@ rule all:
                 allow_missing=True,
             ),
             zip,
-            **inputs.zip_lists['ieeg']
+            **filtered_ziplist
         )
     default_target: True
