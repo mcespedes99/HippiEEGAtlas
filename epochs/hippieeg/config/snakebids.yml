@@ -4,6 +4,8 @@ bids_dir_tsv: '/home/mcesped/projects/ctb-akhanf/cfmm-bids/Khan/clinical_imaging
 
 # Resources
 memory: 64000
+local_scratch: '/tmp'
+local_scratch_env: 'SLURM_TMPDIR'
 
 
 #enable printing debug statements during parsing -- disable if generating dag visualization

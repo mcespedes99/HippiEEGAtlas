@@ -73,6 +73,19 @@ def get_inputs(input_path, **zip_lists):
 # Get filtered ziplist based on annotations of interest
 filtered_ziplist = get_inputs(inputs.path['annotations'], **inputs.zip_lists['annotations'])
 
+# Function to get size of edf file in mb
+def get_edf_mb(wildcards, input):
+    return int(np.ceil(os.path.getsize(input.edf)/10**6))
+
+# Function to get tmpdir
+def get_tmpdir():
+    if os.environ.get(config['local_scratch_env']) != None:
+        print(os.environ.get(config['local_scratch_env']))
+        return os.environ.get(config['local_scratch_env'])
+    elif os.path.exists(config['local_scratch']):
+        return config['local_scratch']
+    else:
+        return None
 
 #---- end snakebids boilerplate ------------------------------------------------
 rule epochs:
@@ -81,8 +94,7 @@ rule epochs:
         annot = inputs.path['annotations'],
     params:
         script = join(workflow.basedir,'../code/epochs.py'),
-        processes = workflow.cores,
-        mem = config['memory']
+        tmpdir = lambda wc: get_tmpdir()
     output:
         out_edf = bids(
                         root='bids',
@@ -90,7 +102,9 @@ rule epochs:
                         suffix='ieeg_epoch.edf',
                         **inputs.wildcards['ieeg']
                   )
-    threads: workflow.cores # Set equal to the number of cores to avoid parallel runs
+    threads: 8 # This can be changed using --set-threads epochs=N. It acts as a balance between subject and channel parallelization
+    resources:
+        storage_mb = get_edf_mb
     log:
         bids(
             root='logs',

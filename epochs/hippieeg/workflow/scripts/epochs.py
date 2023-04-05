@@ -11,8 +11,9 @@ import os
 
 edf = snakemake.input.edf
 annot_file = snakemake.input.annot
-processes = int(snakemake.params.processes)
+processes = int(snakemake.threads)
 out_edf = snakemake.output.out_edf
+tmpdir = snakemake.params.tmpdir
 
 # Import file:
 try:
@@ -36,13 +37,12 @@ try:
     size_edf = os.path.getsize(edf)/1000000
     # Copy file to local scratch if possible
     new_edf = None
-    if size_edf <= 0.9*int(snakemake.params.mem):
+    if tmpdir != None:
         # Copy file to local scratch
         print('here')
         file_name = os.path.basename(edf)
         new_edf = os.path.join('/tmp',file_name)
-        if not os.path.exists(new_edf): # REMOVE THE IF
-            shutil.copy(edf, new_edf)
+        shutil.copy(edf, new_edf)
     
     # Here call function to create new EDF file
     if (new_edf == None):

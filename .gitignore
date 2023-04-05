@@ -7,11 +7,14 @@ core*
 slurm8
 Test
 slurm*
-code/Position/.ipynb_checkpoints/
-code/DSP/.ipynb_checkpoints/*
+*/.ipynb_checkpoints/*
 epochs/logs/
 epochs/results
 workflow/.ipynb_checkpoints/
 epochs/.snakebids
-epochs/config/
+epochs
 code/DSP/test2.edf
+code/DSP/NoiseDetection/clean_seeg/.ipynb_checkpoints/*
+code/DSP/.ipynb_checkpoints/
+code/DSP/NoiseDetection/.ipynb_checkpoints/
+code/DSP/NoiseDetection/clean_seeg/autoreject/.ipynb_checkpoints
