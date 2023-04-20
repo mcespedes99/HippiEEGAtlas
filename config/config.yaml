@@ -1,6 +1,0 @@
-snsx_patients: >
-                sub-P022 sub-P026 sub-P029 sub-P032
-clinical_patients: > 
-                sub-P002 sub-P003 sub-P016 sub-P004
-
-output_dir: /home/ROBARTS/mcespedes/graham/scratch/Test

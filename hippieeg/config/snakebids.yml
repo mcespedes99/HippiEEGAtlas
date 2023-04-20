@@ -32,7 +32,7 @@ targets_by_analysis_level:
 pybids_inputs:
   ieeg:
     filters:
-      suffix: 'ieeg'
+      suffix: 'clean'
       extension: '.edf'
       datatype: 'ieeg'
     wildcards:

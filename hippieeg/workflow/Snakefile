@@ -1,0 +1,93 @@
+#---- begin snakebids boilerplate ----------------------------------------------
+
+import snakebids
+from snakebids import bids
+from os.path import join
+from itertools import compress
+import fnmatch
+import numpy as np
+import pandas as pd
+
+
+configfile: workflow.source_path('../config/snakebids.yml')
+
+# Get input wildcards
+inputs = snakebids.generate_inputs(
+    bids_dir=config["bids_dir"],
+    pybids_inputs=config["pybids_inputs"],
+    pybids_database_dir=config.get("pybids_db_dir"),
+    pybids_reset_database=config.get("pybids_db_reset"),
+    derivatives=config.get("derivatives", None),
+    participant_label=config.get("participant_label", None),
+    exclude_participant_label=config.get("exclude_participant_label", None),
+    use_bids_inputs=True,
+)
+subj_session_list = list(zip(inputs.zip_lists['ieeg']['subject'],inputs.zip_lists['ieeg']['session']))
+
+#this adds constraints to the bids naming
+wildcard_constraints:  **snakebids.get_wildcard_constraints(config['pybids_inputs'])
+
+# Function to get size of edf file in mb
+def get_edf_mb(wildcards, input):
+    return int(np.ceil(os.path.getsize(input.edf)/10**6))
+
+# Function to get tmpdir
+def get_tmpdir():
+    if os.environ.get(config['local_scratch_env']) != None:
+        return os.environ.get(config['local_scratch_env'])
+    elif os.path.exists(config['local_scratch']):
+        return config['local_scratch']
+    else:
+        return None
+
+#---- end snakebids boilerplate ------------------------------------------------
+rule get_length:
+    input:
+        edf = expand(
+                    expand(
+                        inputs.path['ieeg'],
+                        allow_missing=True,
+                    ),
+                    zip,
+                    **inputs.zip_lists['ieeg']
+                )
+    threads: 16
+    output:
+        out_csv = 'files_length.csv'
+    script: join(workflow.basedir,'scripts/get_length.py')
+
+# Standarization
+rule standardize:
+    input:
+        edf = inputs.path['ieeg'],
+        max_len_csv = rules.get_length.output.out_csv,
+    threads: 1
+    params:
+        new_length = 'min' # Can be 'max' or 'min'
+    log:
+        bids(
+            root='logs',
+            suffix='epochs_std.log',
+            **inputs.wildcards['ieeg']
+        ),
+    output:
+        out_edf = bids(
+                        root='bids',
+                        datatype='ieeg',
+                        suffix='standardized.edf',
+                        **inputs.wildcards['ieeg']
+                  ),
+    script: join(workflow.basedir,'scripts/standardize.py')
+
+# All rule
+rule all:
+    input:
+        expand(
+            expand(
+                rules.standardize.output,
+                allow_missing=True,
+            ),
+            zip,
+            **inputs.zip_lists['ieeg']
+        )
+    default_target: True
