@@ -1,0 +1,23 @@
+{
+    "Name": "hippieeg - App to process iEEG recordings",
+    "BIDSVersion": "1.4.0",
+    "DatasetType": "derivative",
+    "PipelineDescription":
+        {
+            "Name": "hippieeg",
+            "Version": "0.1.0",
+            "CodeURL": "http://github.com/mcespedes99/hippieeg",
+            "Author": "Mauricio Cespedes Tenorio",
+            "AuthorEmail": "mcesped@uwo.ca"
+        },
+    "GeneratedBy": [
+        {
+            "Name": "hippieeg",
+            "Version": "0.1.0",
+            "CodeURL": "http://github.com/mcespedes99/hippieeg",
+            "Author": "Mauricio Cespedes Tenorio",
+            "AuthorEmail": "mcesped@uwo.ca"
+ 
+        }
+    ]
+}
