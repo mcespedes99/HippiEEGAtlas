@@ -52,6 +52,8 @@ rule get_length:
                     **inputs.zip_lists['ieeg']
                 )
     threads: 16
+    resources:
+        mem_mb = 64000
     output:
         out_csv = 'files_length.csv'
     script: join(workflow.basedir,'scripts/get_length.py')
@@ -61,7 +63,7 @@ rule standardize:
     input:
         edf = inputs.path['ieeg'],
         max_len_csv = rules.get_length.output.out_csv,
-    threads: 1
+    threads: 8
     params:
         new_length = 'min' # Can be 'max' or 'min'
     log:
