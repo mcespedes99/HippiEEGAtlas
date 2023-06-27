@@ -32,7 +32,7 @@ targets_by_analysis_level:
 pybids_inputs:
   ieeg:
     filters:
-      suffix: 'clean'
+      suffix: 'ieeg'
       extension: '.edf'
       datatype: 'ieeg'
     wildcards:
@@ -41,18 +41,20 @@ pybids_inputs:
       - acquisition
       - task
       - run
+      - clip
+    custom_path: '/scratch/mcesped/code/sEEGPrep/Results/anat_run/bids/sub-{subject}/ses-{session}/ieeg/sub-{subject}_ses-{session}_task-{task}_rec-regionID_run-{run}_clip-{clip}_ieeg.edf'
 
-  annotations:
-    filters:
-      suffix: 'annotations'
-      extension: '.tsv'
-      datatype: 'ieeg'
-    wildcards:
-      - subject
-      - session
-      - acquisition
-      - task
-      - run
+  # annotations:
+  #   filters:
+  #     suffix: 'annotations'
+  #     extension: '.tsv'
+  #     datatype: 'ieeg'
+  #   wildcards:
+  #     - subject
+  #     - session
+  #     - acquisition
+  #     - task
+  #     - run
 #this configures the options to save the BIDSLayout
 # by default, database is not saved (uncomment to save)
 # NOTE: pybids_db_dir must be an absolute path

@@ -27,6 +27,9 @@ subj_session_list = list(zip(inputs.zip_lists['ieeg']['subject'],inputs.zip_list
 #this adds constraints to the bids naming
 wildcard_constraints:  **snakebids.get_wildcard_constraints(config['pybids_inputs'])
 
+print(inputs.wildcards['ieeg'])
+print(inputs.zip_lists['ieeg'])
+
 # Function to get size of edf file in mb
 def get_edf_mb(wildcards, input):
     return int(np.ceil(os.path.getsize(input.edf)/10**6))
