@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<GIFTI xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xsi:noNamespaceSchemaLocation="http://brainvis.wustl.edu/caret6/xml_schemas/GIFTI_Caret.xsd"
+       Version="1"
+       NumberOfDataArrays="1">
+   <MetaData>
+      <MD>
+         <Name><![CDATA[AnatomicalStructurePrimary]]></Name>
+         <Value><![CDATA[CortexRight]]></Value>
+      </MD>
+      <MD>
+         <Name><![CDATA[ParentProvenance]]></Name>
+         <Value><![CDATA[/scratch/mcesped/Results/hippunfold/sub-P060/surf/sub-P060_hemi-R_space-T1w_den-0p5mm_label-hipp_inner.surf.gii:
+/opt/workbench/bin_linux64/../exe_linux64/wb_command -surface-apply-affine work/sub-P060/surf/sub-P060_hemi-R_space-corobl_den-0p5mm_label-hipp_inner.surf.gii work/sub-P060/warps/sub-P060_desc-affine_from-T1w_to-corobl_type-ras_xfm.txt hippunfold/sub-P060/surf/sub-P060_hemi-R_space-T1w_den-0p5mm_label-hipp_inner.surf.gii
+
+]]></Value>
+      </MD>
+      <MD>
+         <Name><![CDATA[ProgramProvenance]]></Name>
+         <Value><![CDATA[Connectome Workbench
+Type: Command Line Application
+Version: 1.5.0
+Qt Compiled Version: 5.7.0
+Qt Runtime Version: 5.7.0
+Commit: 76441605d20536d81034a64c9d34ec393aa528b9
+Commit Date: 2021-02-16 13:46:47 -0600
+Compiled with OpenMP: YES
+Compiler: g++ (/home/caret/gcc/install/gcc-4.8.5/bin)
+Compiler Version: 4.8.5
+Compiled Debug: NO
+Operating System: Linux
+]]></Value>
+      </MD>
+      <MD>
+         <Name><![CDATA[Provenance]]></Name>
+         <Value><![CDATA[/opt/workbench/bin_linux64/../exe_linux64/wb_command -volume-to-surface-mapping /scratch/mcesped/code/HippiEEGAtlas/code/DSP/test2.nii.gz /scratch/mcesped/Results/hippunfold/sub-P060/surf/sub-P060_hemi-R_space-T1w_den-0p5mm_label-hipp_inner.surf.gii /scratch/mcesped/code/HippiEEGAtlas/code/DSP/mapping.shape.gii -enclosing]]></Value>
+      </MD>
+      <MD>
+         <Name><![CDATA[WorkingDirectory]]></Name>
+         <Value><![CDATA[/home/mcesped]]></Value>
+      </MD>
+   </MetaData>
+   <LabelTable>
+      <Label Key="0" Red="1" Green="1" Blue="1" Alpha="0"><![CDATA[???]]></Label>
+   </LabelTable>
+<DataArray Intent="NIFTI_INTENT_NORMAL"
+           DataType="NIFTI_TYPE_FLOAT32"
+           ArrayIndexingOrder="RowMajorOrder"
+           Dimensionality="1"
+           Dim0="7262"
+           Encoding="GZipBase64Binary"
+           Endian="LittleEndian"
+           ExternalFileName=""
+           ExternalFileOffset="0">
+   <MetaData>
+      <MD>
+         <Name><![CDATA[Name]]></Name>
+         <Value><![CDATA[ enclosing voxel]]></Value>
+      </MD>
+   </MetaData>
+   <Data>eJzt0AEJAAAIwDCbWc3olhAE3RKcRwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAATKvcLvjJdwAAAADuadZJAX8=</Data>
+</DataArray>
+</GIFTI>
