@@ -16,6 +16,49 @@ import matplotlib.pyplot as plt
 
 
 # Computation
+# Reduce dimension of frequency dataArray
+def average_per_channel(DataArray: xr.DataArray):
+    new_data = np.array([])
+    subj_chn = []
+    new_subjs = []
+    new_chns = []
+    group = []
+    PD_coords = np.array([])
+    AP_coords = np.array([])
+    # Compute across subjects
+    subjs = np.unique(DataArray['subj'])
+    for subj in subjs:
+        ds_subj = DataArray.where(DataArray['subj']==subj, drop=True)
+        # Compute for each channel
+        chns = np.unique(ds_subj['chn'])
+        for chn in chns:
+            ds_chn = ds_subj.where(ds_subj['chn'] == chn, drop=True)
+            # Get average data
+            data = np.mean(ds_chn.values, axis=0)
+            new_data = np.vstack([new_data.reshape(-1,len(data)), data])
+            # Append coords
+            subj_chn.append(f'sub-{subj}_{chn}')
+            new_subjs.append(subj)
+            new_chns.append(chn)
+            group.append(str(ds_chn.group[0].values))
+            PD_coords = np.hstack([PD_coords, ds_chn.PD[0]])
+            AP_coords = np.hstack([AP_coords, ds_chn.AP[0]])
+    # Build new dataarray
+    ds_MTS = xr.Dataset(
+        {'psd' : (['n', 'frequency'], new_data)},
+        coords={
+            "subj": (["n"], new_subjs),
+            "chn": (["n"], new_chns),
+            "group": (["n"], group),
+            "subj_chn": (["n"], subj_chn),
+            "PD": (["n"], PD_coords),
+            "AP": (["n"], AP_coords),
+            "frequency": DataArray['frequency'].values,
+            'n': np.arange(new_data.shape[0])
+        }
+    )
+    return ds_MTS
+
 # Get bandpower per freq band
 def bandpower(Pxx, f, fmin, fmax):
     ind_min = np.argmax(f > fmin) - 1
@@ -235,7 +278,7 @@ def plot_comparisons(welchpow_list, datasets_names, out_path=None, output=False,
         quant_25 = welchpow.quantile(0.25, dim='n').to_numpy()
         quant_75 = welchpow.quantile(0.75, dim='n').to_numpy()
         # Get frequency
-        freq = welchpow.obj.coords['frequency'].to_numpy()
+        freq = welchpow.coords['frequency'].to_numpy()
 
         ax.semilogx(freq, median_welchpow, color, label=f'{name}')
         ax.fill_between(freq,
@@ -257,36 +300,39 @@ def plot_comparisons(welchpow_list, datasets_names, out_path=None, output=False,
         ax.set_title(title)
     # ax.set_xscale('log')
     if output:
-        fig.savefig(out_path)
+        plt.savefig(out_path)
     if show_fig=='Close':
         plt.close()
     elif show_fig == True:
         plt.show()
 
-def boxplot_bands_xarray(ds: xr.Dataset, data_var: str, group: str):
+def boxplot_bands_xarray(ds: xr.DataArray, group: str, dim: str, hover_data: list = None):
+    # group: like MTS vs non_MTS
+    # dim: were the bands labels are
     # Convert to dataframe
-    data_bands = ds["bandpow"].to_numpy()
-    df_bands = pd.DataFrame(data_bands, columns=ds["f_bands"].to_numpy())
+    data_bands = ds.to_numpy()
+    df_bands = pd.DataFrame(data_bands, columns=ds[dim].to_numpy())
     # Add other valuable cols
     cols = [coord for coord in list(ds.coords.keys()) if coord not in ds.dims]
+    # print(cols)
     for col in cols:
         df_bands[col] = ds[col].to_numpy()
     # Get bands from original data (bandpow column)
-    f_bands = ds["f_bands"].to_numpy()
+    f_bands = ds[dim].to_numpy()
 
     # Plot
     fig_list = []
     for band in f_bands:
         fig_list.append(
             px.box(
-                df_bands, x=group, y=band, points="all", title=f"{band} band comparison"
+                df_bands, x=group, y=band, points="all", hover_data=hover_data, title=f"{band} band comparison"
             )
         )
     return fig_list
 
 
 def get_median_diff(
-    data_array: xr.DataArray, group_coord: str, weights_coord: str, dim: str, disp=False
+    data_array: xr.DataArray, group_coord: str, y: str=None, weights_coord: str= None, dim: str= None, disp=False
 ):
     # group_coord: coordinate with groups to compare
     # dim: dimension where the median wants to be computed (for example: 'frequency' to compute the median for each frequency point)
@@ -308,23 +354,106 @@ def get_median_diff(
             print(f"Median diff {band}: {diff}")
     return diff_array
 
+def get_median_diff_no_weights(
+    data_array: xr.DataArray, group_coord: str, y: str=None, dim: str = None, disp=False
+):
+    # group_coord: coordinate with groups to compare
+    # dim: dimension where the median wants to be computed (for example: 'frequency' to compute the median for each frequency point)
+    groups = np.unique(data_array[group_coord])
+    assert len(groups) == 2
+    # Convert arrays to weighted array
+    array_1 = data_array.where(data_array[group_coord] == groups[0], drop=True)
+    array_2 = data_array.where(data_array[group_coord] == groups[1], drop=True)
+    # Compute diff
+    diff_array = (
+        array_1.median(dim='n').to_numpy()
+        - array_2.median(dim='n').to_numpy()
+    )
+    if disp:
+        if dim:
+            bands = data_array[dim].to_numpy()
+            for band, diff in zip(bands, diff_array):
+                print(f"Median diff {band}: {diff}")
+        else:
+            print(f"Median diff: {diff_array}")
+    return diff_array
+
+def get_slope_diff(data_array: xr.DataArray, group_coord: str, y: str, dim: str = None, disp=False
+):
+    return get_reg_diff(data_array, group_coord, y, dim, disp, coeff='slope')
+
+def get_intercept_diff(data_array: xr.DataArray, group_coord: str, y: str, dim: str = None, disp=False
+):
+    return get_reg_diff(data_array, group_coord, y, dim, disp, coeff='intercept')
+
+def get_reg_diff(
+    data_array: xr.DataArray, group_coord: str, y: str, dim: str = None, disp=False, coeff='slope'
+):
+    from sklearn.linear_model import LinearRegression
+    # group_coord: coordinate with groups to compare
+    # dim: dimension where the median wants to be computed (for example: 'frequency' to compute the median for each frequency point)
+    groups = np.unique(data_array[group_coord])
+    assert len(groups) == 2
+    # Convert arrays to weighted array
+    array_1 = data_array.where(data_array[group_coord] == groups[0], drop=True)
+    array_2 = data_array.where(data_array[group_coord] == groups[1], drop=True)
+    # Compute diff per dim
+    if dim: 
+        bands = data_array[dim].to_numpy()
+        coefs = np.zeros(2)
+        diff_array = []
+        for band in bands:
+            for i, array in enumerate([array_1, array_2]):
+                data_band_array = array.where(array[dim] == band, drop=True)
+                X_1 = data_band_array.values
+                y_1 = data_band_array[y].values
+                reg = LinearRegression().fit(X_1, y_1)
+                if coeff=='intercept':
+                    coefs[i] = reg.intercept_
+                else:
+                    coefs[i] = reg.coef_[-1]
+            diff_array.append(coefs[0]-coefs[1])
+    else:
+        coefs = np.zeros(2)
+        diff_array = []
+        for i, array in enumerate([array_1, array_2]):
+            data_band_array = array
+            X_1 = data_band_array.values
+            y_1 = data_band_array_1[y].values
+            reg = LinearRegression().fit(X_1, y_1)
+            if coeff=='intercept':
+                coefs[i] = reg.intercept_
+            else:
+                coefs[i] = reg.coef_[-1]
+        diff_array.append(coefs[0]-coefs[1])
+    # Convert to numpy
+    diff_array = np.array(diff_array)
+    if disp:
+        if dim:
+            bands = data_array[dim].to_numpy()
+            for band, diff in zip(bands, diff_array):
+                print(f"Median diff {band}: {diff}")
+        else:
+            print(f"Median diff: {diff_array}")
+    return diff_array
+
 
 def get_permvals(
-    data_array: xr.DataArray, group_coord: str, weights_coord: str, dim: str
+    data_array: xr.DataArray, group_coord: str, func, dim: str = None, y: str=None
 ):
     # First sort based on the coordinate of importance
     sorted_array = data_array.sortby(group_coord)
     # Permute the indexes
     perm_idx = np.random.permutation(data_array.indexes["n"])
     # Permuted array
-    perm_array = sorted_array.loc[perm_idx, :].copy()
+    perm_array = sorted_array.loc[perm_idx, ...].copy()
     # Assign permuted labels
     perm_array = perm_array.assign_coords(
         permlabels=("n", sorted_array[group_coord].copy().to_numpy())
     )
     # Get permuted median diff
-    perm_diff = get_median_diff(
-        perm_array, "permlabels", weights_coord, dim, disp=False
+    perm_diff = func(
+        perm_array, "permlabels", y, dim, disp=False
     )
 
     del perm_array
@@ -334,22 +463,28 @@ def get_permvals(
 def permutation_test(
     data_array: xr.DataArray,
     group_coord: str,
-    weights_coord: str,
-    dim: str,
     n_perm: int,
+    func,
+    dim: str = None,
+    y: str=None,
 ):
     # group_coord: coordinate with groups to compare
     # dim: dimension where the p-vals wants to be computed (for example: 'frequency' to compute the median for each frequency point)
     # Get original median diff
     print("Median difference for true labels")
-    true_cond = get_median_diff(data_array, group_coord, weights_coord, dim, disp=True)
+    true_cond = func(data_array, group_coord, y, dim, disp=True)
     # Build perm matrix based on number of permutations (n_perm) and the number of labels in dim (number of p-vals to compute)
-    permvals = np.zeros((n_perm, len(data_array[dim])))
-    for i in range(n_perm):
-        permvals[i, :] = get_permvals(data_array, group_coord, weights_coord, dim)
+    if dim:
+        permvals = np.zeros((n_perm, len(data_array[dim])))
+        for i in range(n_perm):
+            permvals[i, :] = get_permvals(data_array, group_coord, func, dim, y)
+    else:
+        permvals = np.zeros((n_perm, 1))
+        for i in range(n_perm):
+            permvals[i,...] = get_permvals(data_array, group_coord, func, dim, y)
 
     # method p_c
-    p_c = np.sum(np.abs(permvals) > np.abs(true_cond), axis=0) / n_perm
+    p_c = np.sum(np.abs(permvals) >= np.abs(true_cond), axis=0) / n_perm
     return p_c, permvals
 
 def eval_significance(p_vals, labels):
